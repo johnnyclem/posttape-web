@@ -2,6 +2,8 @@
 
 GitHub for songs. Musicians and producers share Ableton Live sets (and flat DAW folders), detect plugins, freeze tracks so collaborators can open a project without matching racks, and sketch arrangements in-browser — the modern version of mailing tapes back and forth.
 
+**Live:** [posttape-web.vercel.app](https://posttape-web.vercel.app)
+
 ## What this prototype does
 
 - **Song repos** — public/private songs, collaborators, stars, commit history
@@ -31,7 +33,9 @@ npm run build
 
 ## Deploy
 
-Vercel (Nitro `vercel` preset). Optional env:
+Vercel (Nitro `vercel` preset). Production is at [posttape-web.vercel.app](https://posttape-web.vercel.app).
+
+Optional env:
 
 - `DATABASE_URL` — Neon/Postgres. Without it the app uses embedded PGLite (data resets on cold start).
 - `BETTER_AUTH_SECRET` / `BETTER_AUTH_URL` — production auth.
