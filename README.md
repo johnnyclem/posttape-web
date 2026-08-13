@@ -24,8 +24,6 @@ npm install
 npm run dev
 ```
 
-App listens on `0.0.0.0:8080`.
-
 ```bash
 npm run typecheck
 npm run build
@@ -33,9 +31,11 @@ npm run build
 
 ## Deploy
 
-Vercel. `npm run build` emits a Nitro `vercel` preset. Optional env: `DATABASE_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `GROK_AUTH_*`.
+Vercel (Nitro `vercel` preset). Optional env:
 
-Without `DATABASE_URL` the deploy uses embedded PGLite (auth + app data reset on cold start). For a persistent prototype, attach Neon and set `DATABASE_URL`.
+- `DATABASE_URL` — Neon/Postgres. Without it the app uses embedded PGLite (data resets on cold start).
+- `BETTER_AUTH_SECRET` / `BETTER_AUTH_URL` — production auth.
+- `GROK_AUTH_*` — Google / X sign-in via the auth broker.
 
 ## Product notes
 
