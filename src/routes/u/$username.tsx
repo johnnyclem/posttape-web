@@ -4,6 +4,8 @@ import { SongCard } from "@/components/song-card";
 import { Avatar } from "@/components/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { useCurrentUserState } from "@/lib/auth/use-current-user";
+import { canAccessSong } from "@/lib/roles";
 import { usePosttape } from "@/lib/store";
 
 export const Route = createFileRoute("/u/$username")({
@@ -12,10 +14,12 @@ export const Route = createFileRoute("/u/$username")({
 
 function ProfilePage() {
   const { username } = Route.useParams();
+  const { user, isPending } = useCurrentUserState();
   const getArtist = usePosttape((s) => s.getArtist);
   const songsForUser = usePosttape((s) => s.songsForUser);
   const albums = usePosttape((s) => s.albums);
   const artist = getArtist(username);
+  const viewerId = isPending ? undefined : (user?.id ?? null);
 
   if (!artist) {
     return (
@@ -30,10 +34,12 @@ function ProfilePage() {
     );
   }
 
-  const songs = songsForUser(artist.id).filter(
-    (s) => s.visibility === "public" || s.ownerId === artist.id,
+  const songs = songsForUser(artist.id).filter((s) =>
+    viewerId === undefined ? s.visibility === "public" : canAccessSong(s, viewerId),
   );
-  const myAlbums = albums.filter((a) => a.ownerId === artist.id);
+  const myAlbums = albums.filter(
+    (a) => a.ownerId === artist.id && a.visibility === "public",
+  );
 
   return (
     <AppShell>

@@ -16,6 +16,7 @@ import { Route as ExploreRouteImport } from './routes/explore'
 import { Route as LibraryRouteImport } from './routes/library'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as NewRouteImport } from './routes/new'
+import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as UUsernameRouteImport } from './routes/u/$username'
 import { Route as AlbumsOwnerSlugRouteImport } from './routes/albums/$owner/$slug'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
@@ -58,6 +59,11 @@ const NewRoute = NewRouteImport.update({
   path: '/new',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const UUsernameRoute = UUsernameRouteImport.update({
   id: '/u/$username',
   path: '/u/$username',
@@ -97,6 +103,7 @@ export interface FileRoutesByFullPath {
   '/library': typeof LibraryRoute
   '/login': typeof LoginRoute
   '/new': typeof NewRoute
+  '/settings': typeof SettingsRoute
   '/u/$username': typeof UUsernameRoute
   '/albums/$owner/$slug': typeof AlbumsOwnerSlugRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
@@ -112,6 +119,7 @@ export interface FileRoutesByTo {
   '/library': typeof LibraryRoute
   '/login': typeof LoginRoute
   '/new': typeof NewRoute
+  '/settings': typeof SettingsRoute
   '/u/$username': typeof UUsernameRoute
   '/albums/$owner/$slug': typeof AlbumsOwnerSlugRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
@@ -127,6 +135,7 @@ export interface FileRoutesById {
   '/library': typeof LibraryRoute
   '/login': typeof LoginRoute
   '/new': typeof NewRoute
+  '/settings': typeof SettingsRoute
   '/u/$username': typeof UUsernameRoute
   '/albums/$owner/$slug': typeof AlbumsOwnerSlugRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
@@ -144,6 +153,7 @@ export interface FileRouteTypes {
     | '/library'
     | '/login'
     | '/new'
+    | '/settings'
     | '/u/$username'
     | '/albums/$owner/$slug'
     | '/api/auth/$'
@@ -159,6 +169,7 @@ export interface FileRouteTypes {
     | '/library'
     | '/login'
     | '/new'
+    | '/settings'
     | '/u/$username'
     | '/albums/$owner/$slug'
     | '/api/auth/$'
@@ -173,6 +184,7 @@ export interface FileRouteTypes {
     | '/library'
     | '/login'
     | '/new'
+    | '/settings'
     | '/u/$username'
     | '/albums/$owner/$slug'
     | '/api/auth/$'
@@ -189,6 +201,7 @@ export interface RootRouteChildren {
   LibraryRoute: typeof LibraryRoute
   LoginRoute: typeof LoginRoute
   NewRoute: typeof NewRoute
+  SettingsRoute: typeof SettingsRoute
   UUsernameRoute: typeof UUsernameRoute
   AlbumsOwnerSlugRoute: typeof AlbumsOwnerSlugRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
@@ -244,6 +257,13 @@ declare module '@tanstack/react-router' {
       path: '/new'
       fullPath: '/new'
       preLoaderRoute: typeof NewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/u/$username': {
@@ -313,6 +333,7 @@ const rootRouteChildren: RootRouteChildren = {
   LibraryRoute: LibraryRoute,
   LoginRoute: LoginRoute,
   NewRoute: NewRoute,
+  SettingsRoute: SettingsRoute,
   UUsernameRoute: UUsernameRoute,
   AlbumsOwnerSlugRoute: AlbumsOwnerSlugRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,

@@ -41,7 +41,8 @@ Companion to `docs/design/UI-UX-SPEC.md` and the interactive master sheet at `/d
 - Real ALS gzip-XML device parse
 - Binary package download of freeze stems
 - Desktop helper / Max device that freezes pre-push
-- Per-user plugin inventory (not just Taylor demo set)
+- Handle claim, session list, account deletion
+- Starrer list, notifications, legal / DMCA
 - Light colourway
 - Real multiplayer presence on a song
 

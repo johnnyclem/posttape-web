@@ -1,5 +1,5 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useEffect, useMemo, useState } from "react";
 import { FileAudio, FolderOpen, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/layout";
@@ -8,6 +8,7 @@ import { Input, Textarea } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
+import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { usePosttape } from "@/lib/store";
 import { getPlugin, needsFreeze } from "@/lib/plugins";
 import type { Visibility } from "@/lib/types";
@@ -18,18 +19,25 @@ export const Route = createFileRoute("/new")({
 
 function NewSongPage() {
   const navigate = useNavigate();
+  const { user, isPending } = useCurrentUserState();
   const createSong = usePosttape((s) => s.createSong);
   const analyzeUpload = usePosttape((s) => s.analyzeUpload);
-  const getArtist = usePosttape((s) => s.getArtist);
+  const ensureArtist = usePosttape((s) => s.ensureArtist);
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [linerNotes, setLinerNotes] = useState("");
   const [visibility, setVisibility] = useState<Visibility>("private");
   const [bpm, setBpm] = useState(120);
   const [key, setKey] = useState("C major");
   const [tags, setTags] = useState("collab");
   const [paths, setPaths] = useState<string[]>([]);
+  const [rights, setRights] = useState(false);
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (user) ensureArtist(user);
+  }, [user, ensureArtist]);
 
   const analysis = useMemo(
     () => (paths.length ? analyzeUpload(paths) : null),
@@ -39,7 +47,6 @@ function NewSongPage() {
   function onFiles(fileList: FileList | null) {
     if (!fileList?.length) return;
     const next = Array.from(fileList).map((f) => {
-      // webkitRelativePath preserves folder structure for directory upload
       const rel = (f as File & { webkitRelativePath?: string }).webkitRelativePath;
       return rel && rel.length > 0 ? rel : f.name;
     });
@@ -53,12 +60,18 @@ function NewSongPage() {
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (!user) return;
+    if (!rights) {
+      toast.error("Affirm you have the right to upload this project");
+      return;
+    }
     setBusy(true);
-    const owner = getArtist("ben")!;
+    const artist = ensureArtist(user);
     const song = createSong({
-      ownerId: owner.id,
+      ownerId: artist.id,
       title: title || "Untitled song",
       description,
+      linerNotes,
       visibility,
       daw: analysis?.daw ?? "ableton",
       bpm,
@@ -68,17 +81,44 @@ function NewSongPage() {
         .map((t) => t.trim())
         .filter(Boolean),
       filePaths: paths,
+      rightsAffirmed: true,
     });
     toast.success("Song created", {
       description: analysis
         ? `Detected ${analysis.daw} · ${analysis.pluginIds.length} devices`
         : "Empty project scaffolded",
     });
-    const username = owner.username;
     navigate({
       to: "/songs/$owner/$slug",
-      params: { owner: username, slug: song.slug },
+      params: { owner: artist.username, slug: song.slug },
     });
+  }
+
+  if (isPending) {
+    return (
+      <AppShell>
+        <div className="mx-auto max-w-lg px-4 py-24 text-center text-sm text-fg-subtle">
+          Loading…
+        </div>
+      </AppShell>
+    );
+  }
+
+  if (!user) {
+    return (
+      <AppShell>
+        <div className="mx-auto max-w-lg px-4 py-24 text-center">
+          <h1 className="font-display text-2xl">Sign in to start a song</h1>
+          <p className="mt-2 text-sm text-fg-muted">
+            New projects are owned by you — private by default, with a rights
+            check before the first take lands.
+          </p>
+          <Button asChild className="mt-6">
+            <Link to="/login">Sign in</Link>
+          </Button>
+        </div>
+      </AppShell>
+    );
   }
 
   return (
@@ -210,6 +250,15 @@ function NewSongPage() {
                 placeholder="What is this song, who is it for, any freeze notes…"
               />
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="liner">Liner notes</Label>
+              <Textarea
+                id="liner"
+                value={linerNotes}
+                onChange={(e) => setLinerNotes(e.target.value)}
+                placeholder="README for collaborators — key, references, freeze notes."
+              />
+            </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="bpm">BPM</Label>
@@ -243,7 +292,7 @@ function NewSongPage() {
               <div>
                 <div className="text-sm font-medium">Private song</div>
                 <div className="text-xs text-fg-subtle">
-                  Only collaborators can open it
+                  Only collaborators can open it. Public later requires a typed confirm.
                 </div>
               </div>
               <Switch
@@ -251,9 +300,28 @@ function NewSongPage() {
                 onCheckedChange={(v) => setVisibility(v ? "private" : "public")}
               />
             </div>
+            <label className="flex items-start gap-3 rounded-[var(--radius-md)] border border-border bg-bg-elevated px-4 py-3 text-sm">
+              <input
+                type="checkbox"
+                className="mt-1 size-4 accent-[var(--color-signal)]"
+                checked={rights}
+                onChange={(e) => setRights(e.target.checked)}
+              />
+              <span>
+                I have the right to upload this project and any samples in it.
+                <span className="mt-1 block text-xs text-fg-subtle">
+                  Required before the first take is stored.
+                </span>
+              </span>
+            </label>
           </div>
 
-          <Button type="submit" size="lg" disabled={busy} className="w-full sm:w-auto">
+          <Button
+            type="submit"
+            size="lg"
+            disabled={busy || !rights}
+            className="w-full sm:w-auto"
+          >
             Create song
           </Button>
         </form>

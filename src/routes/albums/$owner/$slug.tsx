@@ -4,6 +4,7 @@ import { SongCard } from "@/components/song-card";
 import { Avatar } from "@/components/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { usePosttape } from "@/lib/store";
 
 export const Route = createFileRoute("/albums/$owner/$slug")({
@@ -12,10 +13,12 @@ export const Route = createFileRoute("/albums/$owner/$slug")({
 
 function AlbumPage() {
   const { owner, slug } = Route.useParams();
+  const { user, isPending } = useCurrentUserState();
   const getAlbum = usePosttape((s) => s.getAlbum);
   const getArtist = usePosttape((s) => s.getArtist);
   const getSongById = usePosttape((s) => s.getSongById);
   const album = getAlbum(owner, slug);
+  const viewerId = isPending ? undefined : (user?.id ?? null);
 
   if (!album) {
     return (
@@ -32,7 +35,7 @@ function AlbumPage() {
 
   const artist = getArtist(album.ownerId)!;
   const songs = album.songIds
-    .map((id) => getSongById(id))
+    .map((id) => getSongById(id, viewerId))
     .filter(Boolean);
 
   return (

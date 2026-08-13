@@ -2,7 +2,7 @@ import { AlertTriangle, Check, Package, Snowflake } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { TrackWaveRow } from "@/components/waveform";
 import { pluginCompatibility } from "@/lib/ableton";
-import { getPlugin } from "@/lib/plugins";
+import { getPlugin, licenseWarning } from "@/lib/plugins";
 import type { Song } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -36,21 +36,47 @@ export function PluginReport({
         </div>
       </div>
       <ul className="divide-y divide-border">
-        {rows.map(({ plugin, status }) => (
-          <li
-            key={plugin.id}
-            className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm"
-          >
-            <div className="min-w-0">
-              <div className="truncate font-medium text-fg">{plugin.name}</div>
-              <div className="truncate text-xs text-fg-subtle">
-                {plugin.vendor} · {plugin.format}
-                {plugin.version ? ` · v${plugin.version}` : ""} · {plugin.category}
+        {rows.map(({ plugin, status }) => {
+          const warn = licenseWarning(plugin.id);
+          const tracks = song.tracks
+            .filter((t) => t.plugins.some((p) => p.pluginId === plugin.id))
+            .map((t) => t.name);
+          return (
+            <li
+              key={plugin.id}
+              className="flex items-start justify-between gap-3 px-4 py-2.5 text-sm"
+            >
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="truncate font-medium text-fg">{plugin.name}</span>
+                  <Badge variant="default" className="capitalize">
+                    {plugin.deviceClass.replace("-", " ")}
+                  </Badge>
+                  {plugin.licenseClass === "dongle" && (
+                    <Badge variant="warn">Dongle</Badge>
+                  )}
+                  {plugin.licenseClass === "subscription" && (
+                    <Badge variant="signal">Subscription</Badge>
+                  )}
+                </div>
+                <div className="truncate text-xs text-fg-subtle">
+                  {plugin.vendor} · {plugin.format}
+                  {plugin.version ? ` · v${plugin.version}` : ""} ·{" "}
+                  <span className="font-mono">{plugin.identityKey}</span>
+                </div>
+                {tracks.length > 0 && (
+                  <div className="mt-1 text-[11px] text-fg-subtle">
+                    {tracks.join(" · ")}
+                  </div>
+                )}
+                {warn && (
+                  <div className="mt-1 text-[11px] text-warn">{warn}</div>
+                )}
               </div>
-            </div>
-            <StatusChip status={status} />
-          </li>
-        ))}
+              <StatusChip status={status} />
+            </li>
+          );
+        })}
         {rows.length === 0 && (
           <li className="px-4 py-6 text-center text-sm text-fg-subtle">
             No devices detected yet.
@@ -88,61 +114,30 @@ function StatusChip({ status }: { status: "installed" | "missing" | "frozen" }) 
 
 export function TrackList({ song }: { song: Song }) {
   return (
-    <div className="rounded-[var(--radius-lg)] border border-border bg-bg-elevated overflow-hidden">
-      <div className="border-b border-border px-4 py-3 flex items-center justify-between gap-2">
-        <h3 className="text-sm font-medium">Tracks</h3>
-        <span className="text-[11px] text-fg-subtle tabular-nums">
-          {song.tracks.length} lanes
-        </span>
-      </div>
+    <div className="overflow-hidden rounded-[var(--radius-lg)] border border-border bg-bg-elevated">
       <ul className="divide-y divide-border">
-        {song.tracks.map((t) => (
-          <li key={t.id} className="px-4 py-3">
-            <div className="flex items-start gap-3">
-              <span
-                className="mt-1.5 size-2.5 shrink-0 rounded-full"
-                style={{ background: t.color }}
-              />
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-medium text-sm">{t.name}</span>
-                  <Badge variant="default" className="capitalize">
-                    {t.kind}
+        {song.tracks.map((track) => (
+          <li key={track.id} className="px-3 py-2">
+            <TrackWaveRow track={track} />
+            <div className="mt-1 flex flex-wrap gap-1 px-1">
+              {track.plugins.map((p) => {
+                const plug = getPlugin(p.pluginId);
+                return (
+                  <Badge
+                    key={`${track.id}-${p.slot}`}
+                    variant={
+                      p.status === "frozen-away"
+                        ? "signal"
+                        : p.status === "missing"
+                          ? "warn"
+                          : "default"
+                    }
+                    className={cn("text-[10px]")}
+                  >
+                    {plug?.name ?? p.pluginId}
                   </Badge>
-                  <FreezeBadge status={t.freezeStatus} />
-                  {t.durationBars != null && (
-                    <span className="text-[11px] tabular-nums text-fg-subtle">
-                      {t.durationBars} bars
-                    </span>
-                  )}
-                </div>
-                <TrackWaveRow track={t} className="mt-2" />
-                {t.plugins.length > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-1">
-                    {t.plugins.map((p) => {
-                      const plug = getPlugin(p.pluginId);
-                      return (
-                        <span
-                          key={`${t.id}-${p.slot}`}
-                          className={cn(
-                            "rounded-[var(--radius-xs)] border px-1.5 py-0.5 text-[11px]",
-                            p.status === "missing" || p.status === "version-mismatch"
-                              ? "border-warn/30 text-warn"
-                              : p.status === "frozen-away"
-                                ? "border-signal/30 text-signal"
-                                : "border-border text-fg-subtle",
-                          )}
-                        >
-                          {plug?.name ?? p.pluginId}
-                        </span>
-                      );
-                    })}
-                  </div>
-                )}
-                {t.notes && (
-                  <p className="mt-1.5 text-xs text-fg-subtle">{t.notes}</p>
-                )}
-              </div>
+                );
+              })}
             </div>
           </li>
         ))}
@@ -151,29 +146,15 @@ export function TrackList({ song }: { song: Song }) {
   );
 }
 
-function FreezeBadge({ status }: { status: string }) {
-  if (status === "frozen") return <Badge variant="signal">Frozen</Badge>;
-  if (status === "stem") return <Badge variant="ok">Stem</Badge>;
-  if (status === "missing-plugin") return <Badge variant="danger">Missing plug</Badge>;
-  return <Badge variant="warn">Live</Badge>;
-}
-
 export function FileTree({ song }: { song: Song }) {
-  const sorted = [...song.files].sort((a, b) => a.path.localeCompare(b.path));
   return (
-    <div className="rounded-[var(--radius-lg)] border border-border bg-bg-elevated overflow-hidden">
-      <div className="border-b border-border px-4 py-3">
-        <h3 className="text-sm font-medium">Project files</h3>
-      </div>
+    <div className="rounded-[var(--radius-lg)] border border-border bg-bg-elevated">
       <ul className="divide-y divide-border font-mono text-xs">
-        {sorted.map((f) => (
-          <li
-            key={f.id}
-            className="flex items-center justify-between gap-3 px-4 py-2.5 text-fg-muted"
-          >
+        {song.files.map((f) => (
+          <li key={f.id} className="flex items-center justify-between gap-3 px-4 py-2">
             <span className="truncate text-fg">{f.path}</span>
-            <span className="shrink-0 tabular-nums text-fg-subtle">
-              {(f.sizeBytes / 1_000_000).toFixed(1)} MB · {f.kind}
+            <span className="shrink-0 text-fg-subtle">
+              {(f.sizeBytes / 1_000_000).toFixed(1)} MB
             </span>
           </li>
         ))}

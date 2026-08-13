@@ -32,13 +32,17 @@ function ExplorePage() {
     if (filter === "collab-safe") rows = rows.filter((s) => s.freezeReady);
     if (filter === "needs-freeze") rows = rows.filter((s) => !s.freezeReady);
     if (q.trim()) {
-      const qq = q.toLowerCase();
-      rows = rows.filter(
-        (s) =>
-          s.title.toLowerCase().includes(qq) ||
-          s.description.toLowerCase().includes(qq) ||
-          s.tags.some((t) => t.includes(qq)),
-      );
+      const qq = q.toLowerCase().trim();
+      const bpmMatch = qq.match(/^(\d{2,3})\s*(bpm)?$/);
+      rows = rows.filter((s) => {
+        if (s.title.toLowerCase().includes(qq)) return true;
+        if (s.description.toLowerCase().includes(qq)) return true;
+        if (s.tags.some((t) => t.toLowerCase().includes(qq))) return true;
+        if (s.key.toLowerCase().includes(qq)) return true;
+        if (String(s.bpm) === qq || `${s.bpm} bpm` === qq) return true;
+        if (bpmMatch && s.bpm === Number(bpmMatch[1])) return true;
+        return false;
+      });
     }
     return rows.sort(
       (a, b) =>
@@ -65,7 +69,7 @@ function ExplorePage() {
             <Input
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="Search titles, tags…"
+              placeholder="Search titles, tags, key, BPM…"
               className="pl-9"
             />
           </div>

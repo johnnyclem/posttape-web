@@ -109,7 +109,7 @@ function HomePage() {
             <Button asChild variant="outline" size="sm">
               <Link
                 to="/songs/$owner/$slug/prepare"
-                params={{ owner: "ben", slug: "you-and-taylor" }}
+                params={{ owner: "ben", slug: "such-great-heights" }}
               >
                 Try freeze wizard
               </Link>

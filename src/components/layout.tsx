@@ -6,6 +6,7 @@ import {
   Plus,
   Radio,
   Search,
+  Settings,
   X,
 } from "lucide-react";
 import { useState } from "react";
@@ -76,6 +77,18 @@ export function AppHeader() {
             <div className="size-8 animate-pulse rounded-full bg-bg-subtle" />
           ) : user ? (
             <SignedIn>
+              <Link
+                to="/settings"
+                className={cn(
+                  "hidden h-9 items-center gap-1.5 rounded-[var(--radius-sm)] px-2 text-sm md:inline-flex",
+                  pathname.startsWith("/settings")
+                    ? "bg-bg-subtle text-fg"
+                    : "text-fg-muted hover:bg-bg-subtle/60 hover:text-fg",
+                )}
+              >
+                <Settings className="size-3.5" />
+                Settings
+              </Link>
               <UserButton />
             </SignedIn>
           ) : (
@@ -115,6 +128,16 @@ export function AppHeader() {
                 </Link>
               );
             })}
+            {user && (
+              <Link
+                to="/settings"
+                onClick={() => setOpen(false)}
+                className="flex h-11 items-center gap-2 rounded-[var(--radius-sm)] px-3 text-sm text-fg-muted hover:bg-bg-subtle hover:text-fg"
+              >
+                <Settings className="size-4" />
+                Settings
+              </Link>
+            )}
             <Link
               to="/design"
               onClick={() => setOpen(false)}
@@ -142,6 +165,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div className="flex flex-wrap items-center gap-4 text-xs text-fg-subtle">
             <Link to="/design" className="hover:text-fg transition-colors">
               Design system
+            </Link>
+            <Link to="/settings" className="hover:text-fg transition-colors">
+              Settings
             </Link>
             <span>Ableton Live · flat folders · plugin-aware collab</span>
           </div>

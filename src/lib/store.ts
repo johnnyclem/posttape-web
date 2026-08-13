@@ -1,19 +1,25 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { applyFreeze, buildFreezePlan, detectDaw, scanPluginsFromUpload } from "./ableton";
-import { needsFreeze } from "./plugins";
+import { snapshotSong } from "./diff";
+import { genericLiveEnvironment } from "./environment";
+import { needsFreeze, STOCK_PLUGIN_IDS } from "./plugins";
+import { canAccessSong, migrateRole } from "./roles";
 import { ensureSongSession, newClipId, newTrackId } from "./session";
 import { getSpliceSample } from "./splice/catalog";
-import { ACTIVITY, ALBUMS, ARTISTS, SONGS, TAYLOR_INSTALLED } from "./seed";
+import { ACTIVITY, ALBUMS, ARTISTS, ENVIRONMENTS, SONGS } from "./seed";
 import type {
   ActivityItem,
   Album,
   Artist,
+  CollaboratorRole,
+  MachineEnvironment,
   SampleVoice,
   SessionClip,
   Song,
   SongCommit,
   SpliceConnection,
+  TakeComment,
   Visibility,
 } from "./types";
 import { slugify } from "./utils";
@@ -29,17 +35,23 @@ interface PosttapeState {
   songs: Song[];
   albums: Album[];
   activity: ActivityItem[];
-  taylorPlugins: string[];
+  environments: MachineEnvironment[];
   starredIds: string[];
   splice: SpliceConnection;
   hydrated: boolean;
 
   getArtist: (idOrUsername: string) => Artist | undefined;
-  getSong: (owner: string, slug: string) => SongWithSession | undefined;
-  getSongById: (id: string) => SongWithSession | undefined;
+  getSong: (owner: string, slug: string, viewerId?: string | null) => SongWithSession | undefined;
+  getSongById: (id: string, viewerId?: string | null) => SongWithSession | undefined;
   getAlbum: (owner: string, slug: string) => Album | undefined;
   publicSongs: () => Song[];
   songsForUser: (userId: string) => Song[];
+  getEnvironment: (userId: string) => MachineEnvironment;
+  ensureArtist: (user: {
+    id: string;
+    displayName?: string | null;
+    primaryEmail?: string | null;
+  }) => Artist;
 
   toggleStar: (songId: string) => void;
   createSong: (input: {
@@ -52,25 +64,44 @@ interface PosttapeState {
     key: string;
     tags: string[];
     filePaths?: string[];
+    linerNotes?: string;
+    rightsAffirmed?: boolean;
   }) => Song;
-  runFreeze: (songId: string, trackIds: string[], authorId: string) => void;
+  runFreeze: (songId: string, trackIds: string[], authorId: string, targetUserId?: string) => void;
   pushCommit: (
     songId: string,
     authorId: string,
     message: string,
     kind?: SongCommit["kind"],
+    rightsAffirmed?: boolean,
   ) => void;
   inviteCollaborator: (
     songId: string,
     username: string,
-    role: Song["collaborators"][0]["role"],
+    role: CollaboratorRole,
   ) => boolean;
+  setVisibility: (songId: string, visibility: Visibility, confirmation?: string) => boolean;
+  setLinerNotes: (songId: string, notes: string) => void;
+  addComment: (
+    songId: string,
+    input: {
+      authorId: string;
+      body: string;
+      takeId?: string;
+      timecodeSec?: number;
+      trackName?: string;
+    },
+  ) => void;
+  resolveComment: (songId: string, commentId: string, resolved?: boolean) => void;
+  toggleEnvPlugin: (userId: string, pluginId: string) => void;
+  shareEnvironmentWithSong: (userId: string, songId: string, share: boolean) => void;
+  updateProfile: (userId: string, patch: Partial<Pick<Artist, "displayName" | "bio" | "location" | "links">>) => void;
   analyzeUpload: (paths: string[], text?: string[]) => {
     daw: Song["daw"];
     pluginIds: string[];
     evidence: Record<string, string>;
   };
-  freezePlanFor: (songId: string) => ReturnType<typeof buildFreezePlan> | null;
+  freezePlanFor: (songId: string, targetUserId?: string) => ReturnType<typeof buildFreezePlan> | null;
   resetDemo: () => void;
 
   ensureSession: (songId: string) => void;
@@ -101,12 +132,21 @@ interface PosttapeState {
   disconnectSplice: () => void;
 }
 
+function normalizeSong(s: Song): Song {
+  return ensureSongSession({
+    ...s,
+    collaborators: s.collaborators.map((c) => ({ ...c, role: migrateRole(c.role) })),
+    comments: s.comments ?? [],
+    linerNotes: s.linerNotes ?? "",
+  });
+}
+
 const initial = () => ({
   artists: ARTISTS,
-  songs: SONGS.map((s) => ensureSongSession({ ...s, starredByMe: false })),
+  songs: SONGS.map((s) => normalizeSong({ ...s, starredByMe: false })),
   albums: ALBUMS,
   activity: ACTIVITY,
-  taylorPlugins: TAYLOR_INSTALLED,
+  environments: ENVIRONMENTS,
   starredIds: [] as string[],
   splice: { connected: false } as SpliceConnection,
 });
@@ -132,18 +172,24 @@ export const usePosttape = create<PosttapeState>()(
         );
       },
 
-      getSong: (owner, slug) => {
+      getSong: (owner, slug, viewerId) => {
         const artist = get().getArtist(owner);
         if (!artist) return undefined;
         const song = get().songs.find(
           (s) => s.ownerId === artist.id && s.slug === slug,
         );
-        return song ? ensureSongSession(song) : undefined;
+        if (!song) return undefined;
+        if (!canAccessSong(song, viewerId ?? null) && viewerId !== undefined) {
+          return undefined;
+        }
+        return ensureSongSession(song);
       },
 
-      getSongById: (id) => {
+      getSongById: (id, viewerId) => {
         const song = get().songs.find((s) => s.id === id);
-        return song ? ensureSongSession(song) : undefined;
+        if (!song) return undefined;
+        if (viewerId !== undefined && !canAccessSong(song, viewerId)) return undefined;
+        return ensureSongSession(song);
       },
 
       getAlbum: (owner, slug) => {
@@ -166,6 +212,54 @@ export const usePosttape = create<PosttapeState>()(
             s.ownerId === userId ||
             s.collaborators.some((c) => c.userId === userId),
         ),
+
+      getEnvironment: (userId) => {
+        if (userId === genericLiveEnvironment().userId) return genericLiveEnvironment();
+        return (
+          get().environments.find((e) => e.userId === userId) ?? {
+            userId,
+            name: "Untitled machine",
+            kind: "manual" as const,
+            pluginIds: [...STOCK_PLUGIN_IDS],
+            liveVersion: "12",
+            updatedAt: new Date().toISOString(),
+            sharedSongIds: [],
+          }
+        );
+      },
+
+      ensureArtist: (user) => {
+        const existing = get().artists.find((a) => a.id === user.id);
+        if (existing) return existing;
+        const base =
+          slugify(user.displayName || user.primaryEmail?.split("@")[0] || "you") || "you";
+        let username = base;
+        let n = 2;
+        while (get().artists.some((a) => a.username === username)) {
+          username = `${base}${n++}`;
+        }
+        const artist: Artist = {
+          id: user.id,
+          username,
+          displayName: user.displayName || username,
+          bio: "",
+          avatarHue: Math.floor(Math.random() * 360),
+        };
+        const env: MachineEnvironment = {
+          userId: user.id,
+          name: `${artist.displayName} · this browser`,
+          kind: "manual",
+          pluginIds: [...STOCK_PLUGIN_IDS],
+          liveVersion: "12",
+          updatedAt: new Date().toISOString(),
+          sharedSongIds: [],
+        };
+        set((state) => ({
+          artists: [...state.artists, artist],
+          environments: [...state.environments, env],
+        }));
+        return artist;
+      },
 
       toggleStar: (songId) => {
         set((state) => {
@@ -214,7 +308,7 @@ export const usePosttape = create<PosttapeState>()(
                   id: `t-${shortId()}`,
                   name: "Track 1",
                   kind: "midi" as const,
-                  color: "#6366f1",
+                  color: "#64748b",
                   freezeStatus: "live" as const,
                   plugins: scan.pluginIds.slice(0, 2).map((pluginId, slot) => ({
                     pluginId,
@@ -256,7 +350,7 @@ export const usePosttape = create<PosttapeState>()(
                     id: `t-${shortId()}`,
                     name,
                     kind: isMidi ? ("midi" as const) : ("audio" as const),
-                    color: `hsl(${(i * 47) % 360} 60% 45%)`,
+                    color: `hsl(${(i * 47) % 360} 22% 38%)`,
                     freezeStatus: "live" as const,
                     plugins: scan.pluginIds.slice(0, 1).map((pluginId, slot) => ({
                       pluginId,
@@ -270,12 +364,13 @@ export const usePosttape = create<PosttapeState>()(
                   };
                 });
 
-        const song = ensureSongSession({
+        const draft = ensureSongSession({
           id,
           ownerId: input.ownerId,
           slug,
           title: input.title.trim() || "Untitled song",
           description: input.description.trim(),
+          linerNotes: input.linerNotes ?? "",
           visibility: input.visibility,
           daw: detected.daw,
           bpm: input.bpm,
@@ -289,9 +384,11 @@ export const usePosttape = create<PosttapeState>()(
           coverHue: Math.floor(Math.random() * 360),
           freezeReady: scan.pluginIds.every((p) => !needsFreeze(p)),
           pluginIds: scan.pluginIds,
+          rightsAffirmedAt: input.rightsAffirmed ? now : undefined,
           collaborators: [
             { userId: input.ownerId, role: "owner", joinedAt: now },
           ],
+          comments: [],
           tracks,
           files: paths.map((path) => ({
             id: `f-${shortId()}`,
@@ -305,22 +402,24 @@ export const usePosttape = create<PosttapeState>()(
                   : ("other" as const),
             sizeBytes: 1_000_000 + Math.floor(Math.random() * 20_000_000),
           })),
-          commits: [
-            {
-              id: `c-${shortId()}`,
-              shortId: shortId().slice(0, 7),
-              message: "Initial project upload",
-              authorId: input.ownerId,
-              createdAt: now,
-              kind: "init",
-              filesChanged: Math.max(1, paths.length),
-              pluginsDetected: scan.pluginIds.length,
-              tracksFrozen: 0,
-              summary: `Detected ${detected.daw} · ${scan.pluginIds.length} devices`,
-            },
-          ],
+          commits: [],
           clips: [],
         });
+        const initCommit: SongCommit = {
+          id: `c-${shortId()}`,
+          shortId: shortId().slice(0, 7),
+          message: "Initial project upload",
+          authorId: input.ownerId,
+          createdAt: now,
+          kind: "init",
+          filesChanged: Math.max(1, paths.length),
+          pluginsDetected: scan.pluginIds.length,
+          tracksFrozen: 0,
+          summary: `Detected ${detected.daw} · ${scan.pluginIds.length} devices`,
+          hasBounce: true,
+          snapshot: snapshotSong(draft),
+        };
+        const song = { ...draft, commits: [initCommit] };
 
         const activity: ActivityItem = {
           id: `a-${shortId()}`,
@@ -338,17 +437,20 @@ export const usePosttape = create<PosttapeState>()(
         return song;
       },
 
-      runFreeze: (songId, trackIds, authorId) => {
+      runFreeze: (songId, trackIds, authorId, targetUserId) => {
         set((state) => {
           const song = state.songs.find((s) => s.id === songId);
           if (!song) return state;
           const base = ensureSongSession(song);
           const next = applyFreeze(base, trackIds);
           const now = new Date().toISOString();
+          const target = targetUserId
+            ? state.environments.find((e) => e.userId === targetUserId)
+            : undefined;
           const commit: SongCommit = {
             id: `c-${shortId()}`,
             shortId: shortId().slice(0, 7),
-            message: `Freeze ${trackIds.length} track${trackIds.length === 1 ? "" : "s"} for collaborator-safe send`,
+            message: `Freeze package for ${target?.name ?? "collaborator"} (${trackIds.length} track${trackIds.length === 1 ? "" : "s"})`,
             authorId,
             createdAt: now,
             kind: "freeze",
@@ -358,11 +460,15 @@ export const usePosttape = create<PosttapeState>()(
             tracksFrozen: next.tracks.filter(
               (t) => t.freezeStatus === "frozen" || t.freezeStatus === "stem",
             ).length,
-            summary: "Pre-commit freeze hook — third-party devices printed to audio",
+            summary:
+              "Prototype freeze package recorded. A desktop Agent would drive Live; this take is non-destructive to the previous one.",
+            hasBounce: true,
+            snapshot: snapshotSong({ ...next, clips: base.clips }),
           };
           const updated: Song = {
             ...next,
             clips: base.clips,
+            comments: base.comments ?? [],
             commits: [commit, ...next.commits],
           };
           const activity: ActivityItem = {
@@ -370,7 +476,7 @@ export const usePosttape = create<PosttapeState>()(
             kind: "freeze",
             actorId: authorId,
             songId,
-            message: `froze ${trackIds.length} tracks on ${song.title}`,
+            message: `prepared freeze package on ${song.title}`,
             createdAt: now,
           };
           return {
@@ -380,11 +486,12 @@ export const usePosttape = create<PosttapeState>()(
         });
       },
 
-      pushCommit: (songId, authorId, message, kind = "push") => {
+      pushCommit: (songId, authorId, message, kind = "push", rightsAffirmed) => {
         set((state) => {
           const song = state.songs.find((s) => s.id === songId);
           if (!song) return state;
           const now = new Date().toISOString();
+          const live = ensureSongSession(song);
           const commit: SongCommit = {
             id: `c-${shortId()}`,
             shortId: shortId().slice(0, 7),
@@ -398,6 +505,8 @@ export const usePosttape = create<PosttapeState>()(
             tracksFrozen: song.tracks.filter(
               (t) => t.freezeStatus === "frozen" || t.freezeStatus === "stem",
             ).length,
+            hasBounce: true,
+            snapshot: snapshotSong(live),
           };
           return {
             songs: state.songs.map((s) =>
@@ -405,6 +514,7 @@ export const usePosttape = create<PosttapeState>()(
                 ? {
                     ...s,
                     updatedAt: now,
+                    rightsAffirmedAt: rightsAffirmed ? now : s.rightsAffirmedAt,
                     commits: [commit, ...s.commits],
                   }
                 : s,
@@ -439,7 +549,7 @@ export const usePosttape = create<PosttapeState>()(
                     ...s,
                     collaborators: [
                       ...s.collaborators,
-                      { userId: artist.id, role, joinedAt: now },
+                      { userId: artist.id, role: migrateRole(role), joinedAt: now },
                     ],
                     updatedAt: now,
                   }
@@ -461,16 +571,145 @@ export const usePosttape = create<PosttapeState>()(
         return true;
       },
 
+      setVisibility: (songId, visibility, confirmation) => {
+        const song = get().songs.find((s) => s.id === songId);
+        if (!song) return false;
+        if (song.visibility === "private" && visibility === "public") {
+          if (confirmation?.trim().toLowerCase() !== "make public") return false;
+        }
+        set((state) => ({
+          songs: state.songs.map((s) =>
+            s.id === songId
+              ? { ...s, visibility, updatedAt: new Date().toISOString() }
+              : s,
+          ),
+        }));
+        return true;
+      },
+
+      setLinerNotes: (songId, notes) => {
+        set((state) => ({
+          songs: state.songs.map((s) =>
+            s.id === songId
+              ? { ...s, linerNotes: notes, updatedAt: new Date().toISOString() }
+              : s,
+          ),
+        }));
+      },
+
+      addComment: (songId, input) => {
+        const body = input.body.trim();
+        if (!body) return;
+        set((state) => {
+          const song = state.songs.find((s) => s.id === songId);
+          if (!song) return state;
+          const now = new Date().toISOString();
+          const comment: TakeComment = {
+            id: `cm-${shortId()}`,
+            takeId: input.takeId ?? song.commits[0]?.id ?? "head",
+            authorId: input.authorId,
+            body,
+            createdAt: now,
+            timecodeSec: input.timecodeSec,
+            trackName: input.trackName,
+          };
+          return {
+            songs: state.songs.map((s) =>
+              s.id === songId
+                ? { ...s, comments: [comment, ...(s.comments ?? [])], updatedAt: now }
+                : s,
+            ),
+            activity: [
+              {
+                id: `a-${shortId()}`,
+                kind: "comment",
+                actorId: input.authorId,
+                songId,
+                message: `commented on ${song.title}`,
+                createdAt: now,
+              },
+              ...state.activity,
+            ],
+          };
+        });
+      },
+
+      resolveComment: (songId, commentId, resolved = true) => {
+        set((state) => ({
+          songs: state.songs.map((s) =>
+            s.id === songId
+              ? {
+                  ...s,
+                  comments: (s.comments ?? []).map((c) =>
+                    c.id === commentId ? { ...c, resolved } : c,
+                  ),
+                }
+              : s,
+          ),
+        }));
+      },
+
+      toggleEnvPlugin: (userId, pluginId) => {
+        set((state) => {
+          const existing = state.environments.find((e) => e.userId === userId);
+          const base = existing ?? get().getEnvironment(userId);
+          const has = base.pluginIds.includes(pluginId);
+          const next: MachineEnvironment = {
+            ...base,
+            pluginIds: has
+              ? base.pluginIds.filter((id) => id !== pluginId)
+              : [...base.pluginIds, pluginId],
+            updatedAt: new Date().toISOString(),
+          };
+          return {
+            environments: existing
+              ? state.environments.map((e) => (e.userId === userId ? next : e))
+              : [...state.environments, next],
+          };
+        });
+      },
+
+      shareEnvironmentWithSong: (userId, songId, share) => {
+        set((state) => ({
+          environments: state.environments.map((e) => {
+            if (e.userId !== userId) return e;
+            const has = e.sharedSongIds.includes(songId);
+            if (share && !has) return { ...e, sharedSongIds: [...e.sharedSongIds, songId] };
+            if (!share && has) {
+              return { ...e, sharedSongIds: e.sharedSongIds.filter((id) => id !== songId) };
+            }
+            return e;
+          }),
+        }));
+      },
+
+      updateProfile: (userId, patch) => {
+        set((state) => ({
+          artists: state.artists.map((a) =>
+            a.id === userId
+              ? {
+                  ...a,
+                  ...patch,
+                  links: patch.links ? patch.links.slice(0, 5) : a.links,
+                }
+              : a,
+          ),
+        }));
+      },
+
       analyzeUpload: (paths, text = []) => {
         const { daw } = detectDaw(paths);
         const { pluginIds, evidence } = scanPluginsFromUpload(paths, text);
         return { daw, pluginIds, evidence };
       },
 
-      freezePlanFor: (songId) => {
+      freezePlanFor: (songId, targetUserId) => {
         const song = get().getSongById(songId);
         if (!song) return null;
-        return buildFreezePlan(song);
+        const env = targetUserId
+          ? get().getEnvironment(targetUserId)
+          : genericLiveEnvironment();
+        return buildFreezePlan(song, env);
       },
 
       resetDemo: () => set({ ...initial(), hydrated: true }),
@@ -544,7 +783,7 @@ export const usePosttape = create<PosttapeState>()(
 
       addTrack: (songId, name) => {
         const id = newTrackId();
-        const colors = ["#c45c26", "#2f6fed", "#7c3aed", "#0d9488", "#e11d48", "#a1a1aa"];
+        const colors = ["#c45c26", "#2f6fed", "#64748b", "#0d9488", "#e11d48", "#a1a1aa"];
         set((state) => {
           const song = state.songs.find((s) => s.id === songId);
           if (!song) return state;
@@ -589,7 +828,7 @@ export const usePosttape = create<PosttapeState>()(
           source: "splice",
           voice: sample.voice,
           spliceAssetId: sample.id,
-          color: `hsl(${sample.hue} 55% 45%)`,
+          color: `hsl(${sample.hue} 22% 38%)`,
         };
         set((state) => {
           const song = state.songs.find((s) => s.id === songId);
@@ -674,19 +913,22 @@ export const usePosttape = create<PosttapeState>()(
       disconnectSplice: () => set({ splice: { connected: false } }),
     }),
     {
-      name: "posttape-v2",
+      name: "posttape-v3",
       partialize: (s) => ({
         songs: s.songs,
         albums: s.albums,
         activity: s.activity,
+        artists: s.artists,
+        environments: s.environments,
         starredIds: s.starredIds,
-        taylorPlugins: s.taylorPlugins,
         splice: s.splice,
       }),
       onRehydrateStorage: () => (state) => {
         if (state) {
           state.hydrated = true;
-          state.songs = state.songs.map((s) => ensureSongSession(s as Song));
+          state.songs = state.songs.map((s) => normalizeSong(s as Song));
+          if (!state.environments?.length) state.environments = ENVIRONMENTS;
+          if (!state.artists?.length) state.artists = ARTISTS;
         }
       },
     },

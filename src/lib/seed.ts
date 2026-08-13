@@ -1,4 +1,5 @@
-import type { ActivityItem, Album, Artist, Song } from "./types";
+import type { ActivityItem, Album, Artist, MachineEnvironment, Song } from "./types";
+import { STOCK_PLUGIN_IDS } from "./plugins";
 
 const daysAgo = (d: number, hours = 0) =>
   new Date(Date.now() - d * 86_400_000 - hours * 3_600_000).toISOString();
@@ -12,6 +13,7 @@ export const ARTISTS: Artist[] = [
     avatarHue: 210,
     location: "Seattle, WA",
     daw: "Ableton Live 12",
+    links: ["https://thepostalservice.com"],
   },
   {
     id: "u-jenny",
@@ -51,6 +53,96 @@ export const ARTISTS: Artist[] = [
   },
 ];
 
+/** Plugins Taylor has installed — used for compatibility checks */
+export const TAYLOR_INSTALLED = [
+  ...STOCK_PLUGIN_IDS,
+  "fabfilter-pro-q3",
+  "fabfilter-pro-c2",
+  "valhalla-vintageverb",
+  "rc20",
+];
+
+export const ENVIRONMENTS: MachineEnvironment[] = [
+  {
+    userId: "u-ben",
+    name: "Ben · Studio Mac",
+    kind: "manual",
+    pluginIds: [
+      ...STOCK_PLUGIN_IDS,
+      "serum2",
+      "valhalla-vintageverb",
+      "fabfilter-pro-q3",
+      "soundtoys-echoboy",
+      "uad-1176",
+      "rc20",
+      "max-for-live-grain",
+      "kontakt",
+      "omnisphere",
+      "ozone-imager",
+    ],
+    liveVersion: "12.1",
+    updatedAt: daysAgo(1),
+    sharedSongIds: ["song-such-great-heights", "song-collab-demo"],
+  },
+  {
+    userId: "u-jimmy",
+    name: "Jimmy · LA desk",
+    kind: "manual",
+    pluginIds: [
+      ...STOCK_PLUGIN_IDS,
+      "serum2",
+      "soundtoys-echoboy",
+      "valhalla-vintageverb",
+      "max-for-live-grain",
+      "max-for-live-lfo",
+      "decapitator",
+    ],
+    liveVersion: "12.0",
+    updatedAt: daysAgo(4),
+    sharedSongIds: ["song-such-great-heights", "song-the-district-sleeps"],
+  },
+  {
+    userId: "u-jenny",
+    name: "Jenny · vocal booth",
+    kind: "manual",
+    pluginIds: [...STOCK_PLUGIN_IDS, "valhalla-vintageverb", "rc20", "soundtoys-echoboy"],
+    liveVersion: "12.0",
+    updatedAt: daysAgo(6),
+    sharedSongIds: ["song-such-great-heights"],
+  },
+  {
+    userId: "u-taylor",
+    name: "Taylor · road laptop",
+    kind: "manual",
+    pluginIds: TAYLOR_INSTALLED,
+    liveVersion: "12.0",
+    updatedAt: daysAgo(0, 4),
+    sharedSongIds: ["song-collab-demo"],
+  },
+  {
+    userId: "u-maya",
+    name: "Maya · Brooklyn",
+    kind: "manual",
+    pluginIds: [...STOCK_PLUGIN_IDS, "valhalla-vintageverb", "ozone-imager"],
+    liveVersion: "11.3",
+    updatedAt: daysAgo(8),
+    sharedSongIds: ["song-coastal"],
+  },
+];
+
+const SGH_NOTES = `## Such Great Heights
+
+Bones from Seattle. Electronics from L.A. The point of this tape is that **Taylor can open it** without Serum or Granulator.
+
+### Still live
+- Lead_Heights — Serum 2 + EchoBoy
+- Pad_Cloud — Granulator III
+- Bass_Analog — Operator (editable) + Pro-Q 3
+- Vox_Harm — space still live
+
+Freeze those four before a mix pass on a stock Live machine.
+`;
+
 export const SONGS: Song[] = [
   {
     id: "song-such-great-heights",
@@ -59,6 +151,7 @@ export const SONGS: Song[] = [
     title: "Such Great Heights",
     description:
       "The modern tape-in-the-mail workflow. Ben starts the bones in Seattle; Jimmy answers with electronics from L.A. Every push freezes third-party chains so either side can open the set without matching plug-in racks.",
+    linerNotes: SGH_NOTES,
     visibility: "public",
     daw: "ableton",
     bpm: 175,
@@ -72,6 +165,7 @@ export const SONGS: Song[] = [
     forkCount: 96,
     coverHue: 200,
     freezeReady: false,
+    rightsAffirmedAt: daysAgo(120),
     pluginIds: [
       "ableton-eq8",
       "ableton-compressor",
@@ -84,11 +178,32 @@ export const SONGS: Song[] = [
       "soundtoys-echoboy",
       "max-for-live-grain",
       "rc20",
+      "ozone-imager",
     ],
     collaborators: [
       { userId: "u-ben", role: "owner", joinedAt: daysAgo(120) },
-      { userId: "u-jimmy", role: "producer", joinedAt: daysAgo(118) },
-      { userId: "u-jenny", role: "writer", joinedAt: daysAgo(90) },
+      { userId: "u-jimmy", role: "contributor", joinedAt: daysAgo(118) },
+      { userId: "u-jenny", role: "contributor", joinedAt: daysAgo(90) },
+    ],
+    comments: [
+      {
+        id: "cm-sgh-1",
+        takeId: "c-sgh-5",
+        authorId: "u-jimmy",
+        body: "Lead needs a quieter EchoBoy at the chorus — 1:12.",
+        createdAt: daysAgo(1, 2),
+        timecodeSec: 72,
+        trackName: "Lead_Heights",
+      },
+      {
+        id: "cm-sgh-2",
+        takeId: "c-sgh-5",
+        authorId: "u-ben",
+        body: "Got it. I'll freeze after that pass so Taylor can mix.",
+        createdAt: daysAgo(1, 1),
+        trackName: "Lead_Heights",
+        parentId: "cm-sgh-1",
+      },
     ],
     tracks: [
       {
@@ -115,6 +230,7 @@ export const SONGS: Song[] = [
         ],
         durationBars: 96,
         notes: "Jimmy: leave the Operator patch editable for now",
+        sidechainFrom: "t-drums",
       },
       {
         id: "t-lead",
@@ -129,6 +245,7 @@ export const SONGS: Song[] = [
         ],
         durationBars: 64,
         notes: "Requires Serum 2 — freeze before Taylor can open",
+        sendTo: "t-verb",
       },
       {
         id: "t-pads",
@@ -166,6 +283,7 @@ export const SONGS: Song[] = [
           { pluginId: "valhalla-vintageverb", slot: 1, enabled: true, status: "ok" },
         ],
         durationBars: 40,
+        sendTo: "t-verb",
       },
       {
         id: "t-fx",
@@ -176,56 +294,38 @@ export const SONGS: Song[] = [
         plugins: [{ pluginId: "rc20", slot: 0, enabled: true, status: "frozen-away" }],
         durationBars: 96,
       },
+      {
+        id: "t-verb",
+        name: "Return_Hall",
+        kind: "return",
+        color: "#64748b",
+        freezeStatus: "live",
+        plugins: [{ pluginId: "valhalla-vintageverb", slot: 0, enabled: true, status: "ok" }],
+        durationBars: 96,
+        notes: "Shared hall — do not freeze by default",
+      },
+      {
+        id: "t-master",
+        name: "Master",
+        kind: "master",
+        color: "#52525b",
+        freezeStatus: "live",
+        plugins: [
+          { pluginId: "ableton-eq8", slot: 0, enabled: true, status: "ok" },
+          { pluginId: "ozone-imager", slot: 1, enabled: true, status: "ok" },
+        ],
+        durationBars: 96,
+      },
     ],
     files: [
-      {
-        id: "f1",
-        path: "Such_Great_Heights.als",
-        kind: "project",
-        sizeBytes: 2_840_000,
-      },
-      {
-        id: "f2",
-        path: "Samples/Imported/Vox_Lead_T3.wav",
-        kind: "audio",
-        sizeBytes: 48_200_000,
-      },
-      {
-        id: "f3",
-        path: "Samples/Processed/Freeze/Kit_Main_Freeze.wav",
-        kind: "freeze",
-        sizeBytes: 32_100_000,
-      },
-      {
-        id: "f4",
-        path: "Samples/Processed/Freeze/Vox_Lead_Freeze.wav",
-        kind: "freeze",
-        sizeBytes: 41_000_000,
-      },
-      {
-        id: "f5",
-        path: "Samples/Processed/Freeze/Tape_Hiss_Freeze.wav",
-        kind: "freeze",
-        sizeBytes: 18_400_000,
-      },
-      {
-        id: "f6",
-        path: "MIDI/Lead_Heights.mid",
-        kind: "midi",
-        sizeBytes: 12_400,
-      },
-      {
-        id: "f7",
-        path: "Ableton Project Info/Project.cfg",
-        kind: "other",
-        sizeBytes: 420,
-      },
-      {
-        id: "f8",
-        path: "Backup/Such_Great_Heights [2024-11-02].als",
-        kind: "project",
-        sizeBytes: 2_610_000,
-      },
+      { id: "f1", path: "Such_Great_Heights.als", kind: "project", sizeBytes: 2_840_000 },
+      { id: "f2", path: "Samples/Imported/Vox_Lead_T3.wav", kind: "audio", sizeBytes: 48_200_000 },
+      { id: "f3", path: "Samples/Processed/Freeze/Kit_Main_Freeze.wav", kind: "freeze", sizeBytes: 32_100_000 },
+      { id: "f4", path: "Samples/Processed/Freeze/Vox_Lead_Freeze.wav", kind: "freeze", sizeBytes: 41_000_000 },
+      { id: "f5", path: "Samples/Processed/Freeze/Tape_Hiss_Freeze.wav", kind: "freeze", sizeBytes: 18_400_000 },
+      { id: "f6", path: "MIDI/Lead_Heights.mid", kind: "midi", sizeBytes: 12_400 },
+      { id: "f7", path: "Ableton Project Info/Project.cfg", kind: "other", sizeBytes: 420 },
+      { id: "f8", path: "Backup/Such_Great_Heights [2024-11-02].als", kind: "project", sizeBytes: 2_610_000 },
     ],
     commits: [
       {
@@ -239,6 +339,17 @@ export const SONGS: Song[] = [
         pluginsDetected: 3,
         tracksFrozen: 0,
         summary: "Created Ableton project, imported kick sketch",
+        hasBounce: true,
+        snapshot: {
+          trackNames: ["Kit_Main", "Bass_Analog"],
+          pluginIds: ["ableton-drum-rack", "ableton-operator"],
+          tempo: 172,
+          key: "D major",
+          timeSignature: "4/4",
+          frozenTrackIds: [],
+          clipCount: 4,
+          arrangementBars: 64,
+        },
       },
       {
         id: "c-sgh-2",
@@ -252,6 +363,17 @@ export const SONGS: Song[] = [
         pluginsDetected: 5,
         tracksFrozen: 1,
         summary: "Pre-commit freeze on Kit_Main so L.A. can open without Drum Rack samples",
+        hasBounce: true,
+        snapshot: {
+          trackNames: ["Kit_Main", "Bass_Analog", "Pad_Cloud"],
+          pluginIds: ["ableton-drum-rack", "ableton-operator", "ableton-wavetable"],
+          tempo: 175,
+          key: "D major",
+          timeSignature: "4/4",
+          frozenTrackIds: ["t-drums"],
+          clipCount: 8,
+          arrangementBars: 80,
+        },
       },
       {
         id: "c-sgh-3",
@@ -265,6 +387,23 @@ export const SONGS: Song[] = [
         pluginsDetected: 9,
         tracksFrozen: 1,
         summary: "Added third-party chain on Lead_Heights (not yet frozen)",
+        hasBounce: true,
+        snapshot: {
+          trackNames: ["Kit_Main", "Bass_Analog", "Pad_Cloud", "Lead_Heights"],
+          pluginIds: [
+            "ableton-drum-rack",
+            "ableton-operator",
+            "ableton-wavetable",
+            "serum2",
+            "soundtoys-echoboy",
+          ],
+          tempo: 175,
+          key: "D major",
+          timeSignature: "4/4",
+          frozenTrackIds: ["t-drums"],
+          clipCount: 12,
+          arrangementBars: 88,
+        },
       },
       {
         id: "c-sgh-4",
@@ -278,6 +417,7 @@ export const SONGS: Song[] = [
         pluginsDetected: 11,
         tracksFrozen: 3,
         summary: "Freeze hook exported Vox_Lead + Tape_Hiss stems",
+        hasBounce: true,
       },
       {
         id: "c-sgh-5",
@@ -288,9 +428,10 @@ export const SONGS: Song[] = [
         kind: "push",
         parentId: "c-sgh-4",
         filesChanged: 3,
-        pluginsDetected: 11,
+        pluginsDetected: 12,
         tracksFrozen: 3,
         summary: "Open freeze items: Lead_Heights, Pad_Cloud, Bass_Analog, Vox_Harm",
+        hasBounce: true,
       },
     ],
   },
@@ -301,6 +442,7 @@ export const SONGS: Song[] = [
     title: "The District Sleeps Alone Tonight",
     description:
       "Glitch bed from Jimmy, melody from Ben. Private while we sort the Max devices.",
+    linerNotes: "Private WIP. Max devices already frozen. Do not unflatten Granulator.",
     visibility: "private",
     daw: "ableton",
     bpm: 136,
@@ -314,6 +456,7 @@ export const SONGS: Song[] = [
     forkCount: 0,
     coverHue: 280,
     freezeReady: true,
+    rightsAffirmedAt: daysAgo(80),
     pluginIds: [
       "ableton-eq8",
       "ableton-simpler",
@@ -324,7 +467,7 @@ export const SONGS: Song[] = [
     ],
     collaborators: [
       { userId: "u-jimmy", role: "owner", joinedAt: daysAgo(80) },
-      { userId: "u-ben", role: "writer", joinedAt: daysAgo(78) },
+      { userId: "u-ben", role: "contributor", joinedAt: daysAgo(78) },
     ],
     tracks: [
       {
@@ -359,80 +502,48 @@ export const SONGS: Song[] = [
       },
     ],
     files: [
-      {
-        id: "f2-1",
-        path: "District_Sleeps.als",
-        kind: "project",
-        sizeBytes: 1_920_000,
-      },
-      {
-        id: "f2-2",
-        path: "Samples/Processed/Freeze/Glitch_Bed_Freeze.wav",
-        kind: "freeze",
-        sizeBytes: 28_000_000,
-      },
-      {
-        id: "f2-3",
-        path: "Samples/Processed/Freeze/Vox_District_Freeze.wav",
-        kind: "freeze",
-        sizeBytes: 36_500_000,
-      },
+      { id: "f2-1", path: "District_Sleeps.als", kind: "project", sizeBytes: 1_920_000 },
     ],
     commits: [
       {
-        id: "c-dsa-1",
-        shortId: "d1s2t3",
-        message: "Scaffold private set",
-        authorId: "u-jimmy",
-        createdAt: daysAgo(80),
-        kind: "init",
-        filesChanged: 2,
-        pluginsDetected: 2,
-        tracksFrozen: 0,
-      },
-      {
-        id: "c-dsa-2",
-        shortId: "u4v5w6",
-        message: "Freeze Max devices + Decapitator vocal for Ben",
+        id: "c-ds-1",
+        shortId: "d15t00",
+        message: "Freeze Max bed for Ben",
         authorId: "u-jimmy",
         createdAt: daysAgo(2),
         kind: "freeze",
-        parentId: "c-dsa-1",
-        filesChanged: 5,
+        filesChanged: 3,
         pluginsDetected: 6,
         tracksFrozen: 3,
-        summary: "Collaborator-safe — all third-party chains frozen",
+        hasBounce: true,
       },
     ],
   },
   {
     id: "song-night-drive",
-    ownerId: "u-taylor",
+    ownerId: "u-maya",
     slug: "night-drive-sketch",
     title: "Night Drive (sketch)",
     description:
       "Flat folder from a Logic bounce + Ableton re-amp. No .als required — any DAW can drop stems here.",
     visibility: "public",
     daw: "folder",
-    bpm: 98,
-    key: "F# minor",
+    bpm: 96,
+    key: "F minor",
     timeSignature: "4/4",
-    tags: ["sketch", "stems", "folder"],
-    createdAt: daysAgo(14),
+    tags: ["sketch", "stems"],
+    createdAt: daysAgo(12),
     updatedAt: daysAgo(0, 8),
     starCount: 214,
     forkCount: 18,
     coverHue: 160,
     freezeReady: true,
-    pluginIds: ["ableton-eq8", "fabfilter-pro-q3", "valhalla-vintageverb"],
-    collaborators: [
-      { userId: "u-taylor", role: "owner", joinedAt: daysAgo(14) },
-      { userId: "u-maya", role: "mixer", joinedAt: daysAgo(10) },
-    ],
+    pluginIds: ["ableton-eq8", "ableton-reverb"],
+    collaborators: [{ userId: "u-maya", role: "owner", joinedAt: daysAgo(12) }],
     tracks: [
       {
         id: "t3-drums",
-        name: "Drums_Stem",
+        name: "drums_bus.wav",
         kind: "audio",
         color: "#ea580c",
         freezeStatus: "stem",
@@ -440,59 +551,52 @@ export const SONGS: Song[] = [
       },
       {
         id: "t3-bass",
-        name: "Bass_Stem",
+        name: "bass_reamp.wav",
         kind: "audio",
         color: "#2563eb",
         freezeStatus: "stem",
         plugins: [],
       },
       {
-        id: "t3-synths",
-        name: "Synths_Bus",
+        id: "t3-syn",
+        name: "synth_wide.wav",
         kind: "audio",
         color: "#7c3aed",
         freezeStatus: "stem",
-        plugins: [
-          { pluginId: "fabfilter-pro-q3", slot: 0, enabled: true, status: "frozen-away" },
-        ],
+        plugins: [],
       },
       {
         id: "t3-vox",
-        name: "Guide_Vox",
+        name: "vox_scratch.wav",
         kind: "audio",
         color: "#e11d48",
         freezeStatus: "stem",
-        plugins: [
-          { pluginId: "valhalla-vintageverb", slot: 0, enabled: true, status: "frozen-away" },
-        ],
+        plugins: [],
       },
     ],
     files: [
-      { id: "f3-1", path: "README.txt", kind: "other", sizeBytes: 890 },
-      { id: "f3-2", path: "stems/Drums_Stem.wav", kind: "audio", sizeBytes: 52_000_000 },
-      { id: "f3-3", path: "stems/Bass_Stem.wav", kind: "audio", sizeBytes: 48_000_000 },
-      { id: "f3-4", path: "stems/Synths_Bus.wav", kind: "audio", sizeBytes: 51_200_000 },
-      { id: "f3-5", path: "stems/Guide_Vox.wav", kind: "audio", sizeBytes: 44_100_000 },
-      { id: "f3-6", path: "midi/chords.mid", kind: "midi", sizeBytes: 4_200 },
-      { id: "f3-7", path: "ref/Night_Drive_Rough.mp3", kind: "audio", sizeBytes: 6_200_000 },
+      { id: "f3-1", path: "drums_bus.wav", kind: "audio", sizeBytes: 24_000_000 },
+      { id: "f3-2", path: "bass_reamp.wav", kind: "audio", sizeBytes: 22_000_000 },
+      { id: "f3-3", path: "synth_wide.wav", kind: "audio", sizeBytes: 28_000_000 },
+      { id: "f3-4", path: "vox_scratch.wav", kind: "audio", sizeBytes: 19_000_000 },
     ],
     commits: [
       {
         id: "c-nd-1",
-        shortId: "n1d2r3",
-        message: "Drop Logic stem folder + guide vocal",
-        authorId: "u-taylor",
-        createdAt: daysAgo(14),
+        shortId: "n1te00",
+        message: "Drop stem folder from Logic bounce",
+        authorId: "u-maya",
+        createdAt: daysAgo(12),
         kind: "init",
-        filesChanged: 6,
+        filesChanged: 4,
         pluginsDetected: 0,
         tracksFrozen: 4,
-        summary: "Flat-folder project — no Live set, fully portable",
+        hasBounce: true,
       },
       {
         id: "c-nd-2",
-        shortId: "v4w5x6",
-        message: "Maya: synth bus polish (printed)",
+        shortId: "n1te01",
+        message: "printed synth bus stems",
         authorId: "u-maya",
         createdAt: daysAgo(0, 8),
         kind: "push",
@@ -500,6 +604,7 @@ export const SONGS: Song[] = [
         filesChanged: 2,
         pluginsDetected: 3,
         tracksFrozen: 4,
+        hasBounce: true,
       },
     ],
   },
@@ -551,18 +656,8 @@ export const SONGS: Song[] = [
     ],
     files: [
       { id: "f4-1", path: "Coastal_Hum.als", kind: "project", sizeBytes: 1_100_000 },
-      {
-        id: "f4-2",
-        path: "Samples/Imported/Shore_01.wav",
-        kind: "sample",
-        sizeBytes: 88_000_000,
-      },
-      {
-        id: "f4-3",
-        path: "Samples/Processed/Freeze/Pad_Slow_Freeze.wav",
-        kind: "freeze",
-        sizeBytes: 22_000_000,
-      },
+      { id: "f4-2", path: "Samples/Imported/Shore_01.wav", kind: "sample", sizeBytes: 88_000_000 },
+      { id: "f4-3", path: "Samples/Processed/Freeze/Pad_Slow_Freeze.wav", kind: "freeze", sizeBytes: 22_000_000 },
     ],
     commits: [
       {
@@ -575,6 +670,7 @@ export const SONGS: Song[] = [
         filesChanged: 4,
         pluginsDetected: 4,
         tracksFrozen: 2,
+        hasBounce: true,
       },
     ],
   },
@@ -585,6 +681,14 @@ export const SONGS: Song[] = [
     title: "You + Taylor (demo collab)",
     description:
       "Template for the Postal Service workflow: you work here, Taylor opens a frozen-safe set on their machine.",
+    linerNotes: `## You + Taylor
+
+Private collab desk. Taylor's road laptop has Live stock + FabFilter + Valhalla + RC-20.
+
+**Not on that machine:** Serum 2, Omnisphere, Kontakt, UAD 1176.
+
+Prepare for send targeting Taylor before you mail this tape.
+`,
     visibility: "private",
     daw: "ableton",
     bpm: 118,
@@ -597,6 +701,7 @@ export const SONGS: Song[] = [
     forkCount: 1,
     coverHue: 45,
     freezeReady: false,
+    rightsAffirmedAt: daysAgo(3),
     pluginIds: [
       "ableton-eq8",
       "ableton-operator",
@@ -607,7 +712,7 @@ export const SONGS: Song[] = [
     ],
     collaborators: [
       { userId: "u-ben", role: "owner", joinedAt: daysAgo(3) },
-      { userId: "u-taylor", role: "producer", joinedAt: daysAgo(2) },
+      { userId: "u-taylor", role: "contributor", joinedAt: daysAgo(2) },
     ],
     tracks: [
       {
@@ -629,6 +734,7 @@ export const SONGS: Song[] = [
           { pluginId: "uad-1176", slot: 1, enabled: true, status: "missing" },
         ],
         notes: "Taylor does not have UAD — must freeze",
+        sidechainFrom: "t5-drums",
       },
       {
         id: "t5-keys",
@@ -646,15 +752,18 @@ export const SONGS: Song[] = [
         freezeStatus: "live",
         plugins: [{ pluginId: "serum2", slot: 0, enabled: true, status: "ok" }],
       },
+      {
+        id: "t5-master",
+        name: "Master",
+        kind: "master",
+        color: "#52525b",
+        freezeStatus: "live",
+        plugins: [{ pluginId: "ableton-eq8", slot: 0, enabled: true, status: "ok" }],
+      },
     ],
     files: [
       { id: "f5-1", path: "You_And_Taylor.als", kind: "project", sizeBytes: 1_450_000 },
-      {
-        id: "f5-2",
-        path: "Samples/Imported/scratch_vox.wav",
-        kind: "audio",
-        sizeBytes: 12_000_000,
-      },
+      { id: "f5-2", path: "Samples/Imported/scratch_vox.wav", kind: "audio", sizeBytes: 12_000_000 },
     ],
     commits: [
       {
@@ -668,6 +777,7 @@ export const SONGS: Song[] = [
         pluginsDetected: 6,
         tracksFrozen: 0,
         summary: "4 tracks need freeze before collaborator-safe open",
+        hasBounce: true,
       },
     ],
   },
@@ -719,7 +829,7 @@ export const ACTIVITY: ActivityItem[] = [
     kind: "invite",
     actorId: "u-ben",
     songId: "song-collab-demo",
-    message: "invited Taylor as producer",
+    message: "invited Taylor as contributor",
     createdAt: daysAgo(2),
   },
   {
@@ -738,19 +848,12 @@ export const ACTIVITY: ActivityItem[] = [
     message: "updated album Give Up",
     createdAt: daysAgo(5),
   },
-];
-
-/** Plugins Taylor has installed — used for compatibility checks */
-export const TAYLOR_INSTALLED = [
-  "ableton-eq8",
-  "ableton-compressor",
-  "ableton-reverb",
-  "ableton-operator",
-  "ableton-wavetable",
-  "ableton-simpler",
-  "ableton-drum-rack",
-  "fabfilter-pro-q3",
-  "fabfilter-pro-c2",
-  "valhalla-vintageverb",
-  "rc20",
+  {
+    id: "a7",
+    kind: "comment",
+    actorId: "u-jimmy",
+    songId: "song-such-great-heights",
+    message: "commented at 1:12 on Lead_Heights",
+    createdAt: daysAgo(1, 2),
+  },
 ];

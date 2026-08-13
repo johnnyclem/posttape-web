@@ -121,7 +121,7 @@ export function SessionEditor({
   }, [clips]);
 
   return (
-    <div className="space-y-4">
+    <div className="min-w-0 space-y-4">
       <div className="flex flex-wrap items-center gap-2 rounded-[var(--radius-lg)] border border-border bg-bg-elevated px-3 py-2.5">
         <div className="flex items-center gap-1">
           <Button
@@ -191,7 +191,7 @@ export function SessionEditor({
         </div>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[1fr_320px]">
+      <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
         <div className="overflow-hidden rounded-[var(--radius-lg)] border border-border bg-bg-elevated">
           <div className="border-b border-border px-3 py-2 text-xs text-fg-subtle">
             Multi-track session · drag clips to move · drag right edge to resize ·

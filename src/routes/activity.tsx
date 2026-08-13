@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { GitCommitHorizontal, Radio, Snowflake, Star, UserPlus } from "lucide-react";
 import { AppShell } from "@/components/layout";
 import { Avatar } from "@/components/avatar";
+import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { usePosttape } from "@/lib/store";
 import { formatRelative } from "@/lib/utils";
 
@@ -10,10 +11,12 @@ export const Route = createFileRoute("/activity")({
 });
 
 function ActivityPage() {
+  const { user, isPending } = useCurrentUserState();
   const activity = usePosttape((s) => s.activity);
   const getArtist = usePosttape((s) => s.getArtist);
   const getSongById = usePosttape((s) => s.getSongById);
   const getAlbum = usePosttape((s) => s.albums);
+  const viewerId = isPending ? undefined : (user?.id ?? null);
 
   return (
     <AppShell>
@@ -24,12 +27,16 @@ function ActivityPage() {
         </div>
         <p className="mt-1 text-sm text-fg-muted">
           Pushes, freezes, and invites — the trail of songs moving between desks.
+          Private takes stay off this shelf.
         </p>
 
         <ul className="mt-8 space-y-3">
           {activity.map((item) => {
             const actor = getArtist(item.actorId);
-            const song = item.songId ? getSongById(item.songId) : undefined;
+            const song = item.songId
+              ? getSongById(item.songId, viewerId)
+              : undefined;
+            if (item.songId && !song && viewerId !== undefined) return null;
             const owner = song ? getArtist(song.ownerId) : undefined;
             const album = item.albumId
               ? getAlbum.find((a) => a.id === item.albumId)

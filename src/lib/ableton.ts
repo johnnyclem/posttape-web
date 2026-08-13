@@ -1,10 +1,13 @@
+import { envHas, genericLiveEnvironment } from "./environment";
 import { getPlugin, needsFreeze, PLUGIN_CATALOG } from "./plugins";
 import type {
   FreezePlan,
   FreezePlanItem,
+  MachineEnvironment,
   PluginRef,
   ProjectFile,
   ProjectTrack,
+  RoutingWarning,
   Song,
 } from "./types";
 
@@ -16,11 +19,6 @@ const FOLDER_DAW_HINTS: Record<string, string[]> = {
   folder: ["samples", "audio", "stems", "midi"],
 };
 
-/**
- * Detect DAW kind from uploaded file names / paths.
- * Ableton Live sets are gzip-compressed XML (.als); we treat any .als
- * as Ableton and walk sibling Sample / Freeze / Backup folders.
- */
 export function detectDaw(paths: string[]): {
   daw: Song["daw"];
   projectFile?: string;
@@ -36,14 +34,10 @@ export function detectDaw(paths: string[]): {
       return { daw: daw as Song["daw"], confidence: 0.75 };
     }
   }
+  void ALS_HINTS;
   return { daw: "folder", confidence: 0.5 };
 }
 
-/**
- * Heuristic plugin scan from file paths + optional text peek.
- * Real ALS is gzip XML; in-browser we match known plugin identifiers
- * from filenames, freeze folders, and any readable text chunks.
- */
 export function scanPluginsFromUpload(
   paths: string[],
   textSnippets: string[] = [],
@@ -83,7 +77,6 @@ export function scanPluginsFromUpload(
     }
   }
 
-  // Ableton projects always imply core native devices when .als present
   if (paths.some((p) => p.toLowerCase().endsWith(".als"))) {
     for (const id of ["ableton-eq8", "ableton-compressor"]) {
       if (!pluginIds.includes(id)) pluginIds.push(id);
@@ -93,25 +86,92 @@ export function scanPluginsFromUpload(
   return { pluginIds: [...new Set(pluginIds)], evidence };
 }
 
-export function buildFreezePlan(song: Song): FreezePlan {
+function liveMissing(track: ProjectTrack, env: MachineEnvironment): string[] {
+  const ids: string[] = [];
+  for (const p of track.plugins) {
+    if (!p.enabled || p.status === "frozen-away") continue;
+    if (!needsFreeze(p.pluginId)) continue;
+    if (!envHas(env, p.pluginId)) ids.push(p.pluginId);
+  }
+  return ids;
+}
+
+export function computeRoutingWarnings(
+  song: Song,
+  targetedIds: Set<string>,
+): RoutingWarning[] {
+  const warnings: RoutingWarning[] = [];
+  const byId = new Map(song.tracks.map((t) => [t.id, t]));
+
+  for (const track of song.tracks) {
+    if (track.sidechainFrom && targetedIds.has(track.sidechainFrom)) {
+      const src = byId.get(track.sidechainFrom);
+      warnings.push({
+        kind: "sidechain",
+        trackId: track.id,
+        trackName: track.name,
+        detail: `Sidechain key comes from ${src?.name ?? "another track"} — freezing that source changes this compressor.`,
+      });
+    }
+    if (track.sendTo && targetedIds.has(track.sendTo)) {
+      const dest = byId.get(track.sendTo);
+      warnings.push({
+        kind: "send-to-return",
+        trackId: track.id,
+        trackName: track.name,
+        detail: `Sends to ${dest?.name ?? "a return"} which is targeted — freeze will flatten that bus for every sender.`,
+      });
+    }
+    if (track.groupId && targetedIds.has(track.groupId)) {
+      warnings.push({
+        kind: "group",
+        trackId: track.id,
+        trackName: track.name,
+        detail: "Parent group is targeted — flattening the group changes routing for every child.",
+      });
+    }
+  }
+  return warnings;
+}
+
+export function buildFreezePlan(
+  song: Song,
+  target: MachineEnvironment = genericLiveEnvironment(),
+): FreezePlan {
   const items: FreezePlanItem[] = [];
   const missing: PluginRef[] = [];
   const missingIds = new Set<string>();
+  const targeted = new Set<string>();
 
   for (const track of song.tracks) {
-    const thirdParty = track.plugins.filter((p) => needsFreeze(p.pluginId));
-    const names = thirdParty
-      .map((p) => getPlugin(p.pluginId)?.name ?? p.pluginId)
-      .filter(Boolean) as string[];
+    const names = track.plugins
+      .filter((p) => needsFreeze(p.pluginId))
+      .map((p) => getPlugin(p.pluginId)?.name ?? p.pluginId);
 
-    for (const tp of thirdParty) {
-      if (tp.status === "missing" || tp.status === "version-mismatch") {
-        const ref = getPlugin(tp.pluginId);
-        if (ref && !missingIds.has(ref.id)) {
-          missingIds.add(ref.id);
-          missing.push(ref);
-        }
+    for (const tp of track.plugins) {
+      if (!needsFreeze(tp.pluginId)) continue;
+      if (envHas(target, tp.pluginId)) continue;
+      const ref = getPlugin(tp.pluginId);
+      if (ref && !missingIds.has(ref.id)) {
+        missingIds.add(ref.id);
+        missing.push(ref);
       }
+    }
+
+    if (track.kind === "return" || track.kind === "master") {
+      const lacking = liveMissing(track, target);
+      items.push({
+        trackId: track.id,
+        trackName: track.name,
+        action: "flagged-separately",
+        reason:
+          lacking.length === 0
+            ? `${track.kind === "master" ? "Master" : "Return"} chain is stock-safe for ${target.name} — left out of the default plan so the mix stays editable.`
+            : `${track.kind === "master" ? "Master" : "Return"} uses devices ${target.name} lacks. Freezing it silently changes the mix for every track — override only if you mean to.`,
+        plugins: names,
+        defaultSelected: false,
+      });
+      continue;
     }
 
     if (track.freezeStatus === "frozen" || track.freezeStatus === "stem") {
@@ -124,56 +184,59 @@ export function buildFreezePlan(song: Song): FreezePlan {
             ? "Exported as audio stem — plugins not required"
             : "Already frozen in the Live set",
         plugins: names,
+        defaultSelected: false,
       });
       continue;
     }
 
-    if (thirdParty.length === 0) {
+    const lacking = liveMissing(track, target);
+    if (lacking.length === 0) {
       items.push({
         trackId: track.id,
         trackName: track.name,
         action: "skip-native",
-        reason: "Only Ableton native devices — safe without freeze",
+        reason: `Only devices ${target.name} already has — left live so they can still edit.`,
         plugins: track.plugins.map((p) => getPlugin(p.pluginId)?.name ?? p.pluginId),
+        defaultSelected: false,
       });
       continue;
     }
 
-    // MIDI with synths → freeze; audio with insert FX → freeze or stem
-    if (track.kind === "midi") {
-      items.push({
-        trackId: track.id,
-        trackName: track.name,
-        action: "freeze",
-        reason: `MIDI track uses ${names.join(", ")} — freeze before send so your collaborator can open without those plugs`,
-        plugins: names,
-      });
-    } else {
-      items.push({
-        trackId: track.id,
-        trackName: track.name,
-        action: "export-stem",
-        reason: `Audio track has third-party inserts (${names.join(", ")}) — export a frozen stem`,
-        plugins: names,
-      });
-    }
+    const lackNames = lacking.map((id) => getPlugin(id)?.name ?? id);
+    const action = track.kind === "midi" ? "freeze" : "export-stem";
+    targeted.add(track.id);
+    items.push({
+      trackId: track.id,
+      trackName: track.name,
+      action,
+      reason:
+        track.kind === "midi"
+          ? `MIDI track uses ${lackNames.join(", ")} — ${target.name} cannot open this chain live.`
+          : `Audio inserts ${lackNames.join(", ")} are missing on ${target.name} — print a frozen stem.`,
+      plugins: lackNames,
+      defaultSelected: true,
+    });
   }
 
-  const actionable = items.filter(
-    (i) => i.action === "freeze" || i.action === "export-stem",
-  );
-  const estimatedMb = Math.max(12, actionable.length * 18 + song.tracks.length * 2);
+  const warnings = computeRoutingWarnings(song, targeted);
+  const actionable = items.filter((i) => i.action === "freeze" || i.action === "export-stem");
+  const estimatedMb = Math.max(8, actionable.length * 18 + song.tracks.length * 2);
+  const estimatedSeconds = Math.max(20, actionable.length * 35);
 
   return {
     songId: song.id,
+    targetUserId: target.userId,
+    targetName: target.name,
     items,
+    warnings,
     estimatedMb,
+    estimatedSeconds,
     collaboratorSafe: actionable.length === 0,
     missingPlugins: missing,
   };
 }
 
-/** Apply freeze plan results onto tracks (demo simulation) */
+/** Record a freeze package onto tracks (prototype — does not drive Live). */
 export function applyFreeze(song: Song, trackIds: string[]): Song {
   const tracks: ProjectTrack[] = song.tracks.map((t) => {
     if (!trackIds.includes(t.id)) return t;
@@ -184,8 +247,8 @@ export function applyFreeze(song: Song, trackIds: string[]): Song {
         needsFreeze(p.pluginId) ? { ...p, status: "frozen-away" as const } : p,
       ),
       notes: t.notes
-        ? `${t.notes} · frozen for collab`
-        : "Frozen for collab — original device chain preserved offline",
+        ? `${t.notes} · freeze package recorded`
+        : "Freeze package recorded — original device chain preserved on the source take",
     };
   });
 
@@ -201,6 +264,8 @@ export function applyFreeze(song: Song, trackIds: string[]): Song {
 
   const allFrozen = tracks.every(
     (t) =>
+      t.kind === "return" ||
+      t.kind === "master" ||
       t.freezeStatus === "frozen" ||
       t.freezeStatus === "stem" ||
       !t.plugins.some((p) => needsFreeze(p.pluginId) && p.status !== "frozen-away"),
@@ -226,6 +291,9 @@ export function pluginCompatibility(
       vendor: "Unknown",
       format: "VST3" as const,
       category: "Unknown",
+      deviceClass: "unknown" as const,
+      licenseClass: "paid-perpetual" as const,
+      identityKey: `unknown:${id}`,
     };
     const frozenAway = song.tracks.every((t) =>
       t.plugins
@@ -240,7 +308,7 @@ export function pluginCompatibility(
     if (!usedLive || frozenAway) {
       return { plugin, status: "frozen" as const };
     }
-    if (installedPluginIds.includes(id) || plugin.vendor === "Ableton") {
+    if (installedPluginIds.includes(id) || plugin.deviceClass === "stock") {
       return { plugin, status: "installed" as const };
     }
     return { plugin, status: "missing" as const };
@@ -253,6 +321,24 @@ export function summarizeProject(song: Song): string {
     (t) => t.freezeStatus === "frozen" || t.freezeStatus === "stem",
   ).length;
   return `${song.tracks.length} tracks · ${song.pluginIds.length} devices (${third} third-party) · ${frozen} frozen`;
+}
+
+export function verifyFreeze(song: Song, env: MachineEnvironment): {
+  passed: boolean;
+  remaining: string[];
+} {
+  const remaining: string[] = [];
+  for (const track of song.tracks) {
+    if (track.kind === "return" || track.kind === "master") continue;
+    if (track.freezeStatus !== "live") continue;
+    for (const p of track.plugins) {
+      if (!p.enabled || p.status === "frozen-away") continue;
+      if (needsFreeze(p.pluginId) && !envHas(env, p.pluginId)) {
+        remaining.push(`${track.name}: ${getPlugin(p.pluginId)?.name ?? p.pluginId}`);
+      }
+    }
+  }
+  return { passed: remaining.length === 0, remaining };
 }
 
 export { PLUGIN_CATALOG };
