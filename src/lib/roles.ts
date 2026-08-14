@@ -23,6 +23,10 @@ export function roleOnSong(song: Song, userId: string | null | undefined): Colla
 }
 
 export function canAccessSong(song: Song, userId: string | null | undefined): boolean {
+  if (song.takedownAt) {
+    const role = roleOnSong(song, userId);
+    return role === "owner" || role === "maintainer";
+  }
   if (song.visibility === "public") return true;
   return roleOnSong(song, userId) != null;
 }

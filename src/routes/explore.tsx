@@ -26,7 +26,8 @@ function ExplorePage() {
   const [filter, setFilter] = useState<(typeof FILTERS)[number]["id"]>("all");
 
   const list = useMemo(() => {
-    let rows = songs.filter((s) => s.visibility === "public");
+    let rows = songs.filter((s) => s.visibility === "public" && !s.takedownAt);
+
     if (filter === "ableton") rows = rows.filter((s) => s.daw === "ableton");
     if (filter === "folder") rows = rows.filter((s) => s.daw === "folder");
     if (filter === "collab-safe") rows = rows.filter((s) => s.freezeReady);

@@ -34,6 +34,11 @@ export interface Artist {
   location?: string;
   daw?: string;
   links?: string[];
+  /** FR-A-02 — set when the user claims a unique handle. */
+  handleClaimedAt?: string;
+  /** FR-A-06 — grace period start. */
+  deletedAt?: string;
+  deletionDueAt?: string;
 }
 
 export interface PluginRef {
@@ -182,6 +187,9 @@ export interface Song {
   freezeReady: boolean;
   coverHue: number;
   rightsAffirmedAt?: string;
+  /** FR-N-03 — public access removed; content held, not deleted. */
+  takedownAt?: string;
+  takedownReason?: string;
 }
 
 export interface Album {
@@ -244,6 +252,8 @@ export interface MachineEnvironment {
   updatedAt: string;
   /** Song ids this inventory is shared with (never public). */
   sharedSongIds: string[];
+  pairedAt?: string;
+  userCode?: string;
 }
 
 export interface CompatibilityIssue {
@@ -301,4 +311,93 @@ export interface MusicalDiffEntry {
   label: string;
   before?: string;
   after?: string;
+}
+
+export interface Star {
+  songId: string;
+  userId: string;
+  createdAt: string;
+}
+
+export type NotificationKind =
+  | "mention"
+  | "comment"
+  | "invite"
+  | "push"
+  | "freeze.ready"
+  | "compat.break";
+
+export interface AppNotification {
+  id: string;
+  userId: string;
+  kind: NotificationKind;
+  songId?: string;
+  actorId?: string;
+  message: string;
+  url?: string;
+  createdAt: string;
+  readAt?: string;
+}
+
+export type EmailDigest = "off" | "daily";
+
+export interface NotificationPrefs {
+  mention: boolean;
+  comment: boolean;
+  invite: boolean;
+  push: boolean;
+  freeze: boolean;
+  compat: boolean;
+  digest: EmailDigest;
+}
+
+export interface DeskSession {
+  id: string;
+  userId: string;
+  label: string;
+  createdAt: string;
+  lastActiveAt: string;
+  current?: boolean;
+  revokedAt?: string;
+}
+
+export interface PairingRequest {
+  userCode: string;
+  deviceCode: string;
+  userId: string;
+  machineName: string;
+  createdAt: string;
+  expiresAt: string;
+  status: "pending" | "approved" | "expired";
+  source: "remote" | "local";
+}
+
+export interface AuditEntry {
+  id: string;
+  songId: string;
+  actorId: string;
+  action: string;
+  target?: string;
+  createdAt: string;
+}
+
+export type LegalKind = "dmca" | "counter" | "report";
+
+export interface LegalNotice {
+  id: string;
+  kind: LegalKind;
+  songId?: string;
+  reporterName: string;
+  reporterEmail: string;
+  body: string;
+  createdAt: string;
+  status: "received" | "actioned" | "held";
+}
+
+export interface TransparencyStats {
+  year: number;
+  noticesReceived: number;
+  takedowns: number;
+  counterNotices: number;
+  reports: number;
 }

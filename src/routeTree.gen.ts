@@ -16,7 +16,12 @@ import { Route as ExploreRouteImport } from './routes/explore'
 import { Route as LibraryRouteImport } from './routes/library'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as NewRouteImport } from './routes/new'
+import { Route as NotificationsRouteImport } from './routes/notifications'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as LegalDmcaRouteImport } from './routes/legal/dmca'
+import { Route as LegalPrivacyRouteImport } from './routes/legal/privacy'
+import { Route as LegalTermsRouteImport } from './routes/legal/terms'
+import { Route as LegalTransparencyRouteImport } from './routes/legal/transparency'
 import { Route as UUsernameRouteImport } from './routes/u/$username'
 import { Route as AlbumsOwnerSlugRouteImport } from './routes/albums/$owner/$slug'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
@@ -59,9 +64,34 @@ const NewRoute = NewRouteImport.update({
   path: '/new',
   getParentRoute: () => rootRouteImport,
 } as any)
+const NotificationsRoute = NotificationsRouteImport.update({
+  id: '/notifications',
+  path: '/notifications',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LegalDmcaRoute = LegalDmcaRouteImport.update({
+  id: '/legal/dmca',
+  path: '/legal/dmca',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LegalPrivacyRoute = LegalPrivacyRouteImport.update({
+  id: '/legal/privacy',
+  path: '/legal/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LegalTermsRoute = LegalTermsRouteImport.update({
+  id: '/legal/terms',
+  path: '/legal/terms',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LegalTransparencyRoute = LegalTransparencyRouteImport.update({
+  id: '/legal/transparency',
+  path: '/legal/transparency',
   getParentRoute: () => rootRouteImport,
 } as any)
 const UUsernameRoute = UUsernameRouteImport.update({
@@ -103,7 +133,12 @@ export interface FileRoutesByFullPath {
   '/library': typeof LibraryRoute
   '/login': typeof LoginRoute
   '/new': typeof NewRoute
+  '/notifications': typeof NotificationsRoute
   '/settings': typeof SettingsRoute
+  '/legal/dmca': typeof LegalDmcaRoute
+  '/legal/privacy': typeof LegalPrivacyRoute
+  '/legal/terms': typeof LegalTermsRoute
+  '/legal/transparency': typeof LegalTransparencyRoute
   '/u/$username': typeof UUsernameRoute
   '/albums/$owner/$slug': typeof AlbumsOwnerSlugRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
@@ -119,7 +154,12 @@ export interface FileRoutesByTo {
   '/library': typeof LibraryRoute
   '/login': typeof LoginRoute
   '/new': typeof NewRoute
+  '/notifications': typeof NotificationsRoute
   '/settings': typeof SettingsRoute
+  '/legal/dmca': typeof LegalDmcaRoute
+  '/legal/privacy': typeof LegalPrivacyRoute
+  '/legal/terms': typeof LegalTermsRoute
+  '/legal/transparency': typeof LegalTransparencyRoute
   '/u/$username': typeof UUsernameRoute
   '/albums/$owner/$slug': typeof AlbumsOwnerSlugRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
@@ -135,7 +175,12 @@ export interface FileRoutesById {
   '/library': typeof LibraryRoute
   '/login': typeof LoginRoute
   '/new': typeof NewRoute
+  '/notifications': typeof NotificationsRoute
   '/settings': typeof SettingsRoute
+  '/legal/dmca': typeof LegalDmcaRoute
+  '/legal/privacy': typeof LegalPrivacyRoute
+  '/legal/terms': typeof LegalTermsRoute
+  '/legal/transparency': typeof LegalTransparencyRoute
   '/u/$username': typeof UUsernameRoute
   '/albums/$owner/$slug': typeof AlbumsOwnerSlugRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
@@ -153,7 +198,12 @@ export interface FileRouteTypes {
     | '/library'
     | '/login'
     | '/new'
+    | '/notifications'
     | '/settings'
+    | '/legal/dmca'
+    | '/legal/privacy'
+    | '/legal/terms'
+    | '/legal/transparency'
     | '/u/$username'
     | '/albums/$owner/$slug'
     | '/api/auth/$'
@@ -169,7 +219,12 @@ export interface FileRouteTypes {
     | '/library'
     | '/login'
     | '/new'
+    | '/notifications'
     | '/settings'
+    | '/legal/dmca'
+    | '/legal/privacy'
+    | '/legal/terms'
+    | '/legal/transparency'
     | '/u/$username'
     | '/albums/$owner/$slug'
     | '/api/auth/$'
@@ -184,7 +239,12 @@ export interface FileRouteTypes {
     | '/library'
     | '/login'
     | '/new'
+    | '/notifications'
     | '/settings'
+    | '/legal/dmca'
+    | '/legal/privacy'
+    | '/legal/terms'
+    | '/legal/transparency'
     | '/u/$username'
     | '/albums/$owner/$slug'
     | '/api/auth/$'
@@ -201,7 +261,12 @@ export interface RootRouteChildren {
   LibraryRoute: typeof LibraryRoute
   LoginRoute: typeof LoginRoute
   NewRoute: typeof NewRoute
+  NotificationsRoute: typeof NotificationsRoute
   SettingsRoute: typeof SettingsRoute
+  LegalDmcaRoute: typeof LegalDmcaRoute
+  LegalPrivacyRoute: typeof LegalPrivacyRoute
+  LegalTermsRoute: typeof LegalTermsRoute
+  LegalTransparencyRoute: typeof LegalTransparencyRoute
   UUsernameRoute: typeof UUsernameRoute
   AlbumsOwnerSlugRoute: typeof AlbumsOwnerSlugRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
@@ -259,11 +324,46 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof NewRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/notifications': {
+      id: '/notifications'
+      path: '/notifications'
+      fullPath: '/notifications'
+      preLoaderRoute: typeof NotificationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/settings': {
       id: '/settings'
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/legal/dmca': {
+      id: '/legal/dmca'
+      path: '/legal/dmca'
+      fullPath: '/legal/dmca'
+      preLoaderRoute: typeof LegalDmcaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/legal/privacy': {
+      id: '/legal/privacy'
+      path: '/legal/privacy'
+      fullPath: '/legal/privacy'
+      preLoaderRoute: typeof LegalPrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/legal/terms': {
+      id: '/legal/terms'
+      path: '/legal/terms'
+      fullPath: '/legal/terms'
+      preLoaderRoute: typeof LegalTermsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/legal/transparency': {
+      id: '/legal/transparency'
+      path: '/legal/transparency'
+      fullPath: '/legal/transparency'
+      preLoaderRoute: typeof LegalTransparencyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/u/$username': {
@@ -333,7 +433,12 @@ const rootRouteChildren: RootRouteChildren = {
   LibraryRoute: LibraryRoute,
   LoginRoute: LoginRoute,
   NewRoute: NewRoute,
+  NotificationsRoute: NotificationsRoute,
   SettingsRoute: SettingsRoute,
+  LegalDmcaRoute: LegalDmcaRoute,
+  LegalPrivacyRoute: LegalPrivacyRoute,
+  LegalTermsRoute: LegalTermsRoute,
+  LegalTransparencyRoute: LegalTransparencyRoute,
   UUsernameRoute: UUsernameRoute,
   AlbumsOwnerSlugRoute: AlbumsOwnerSlugRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,

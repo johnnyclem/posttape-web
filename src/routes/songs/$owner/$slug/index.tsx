@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Clock,
   Disc3,
+  Flag,
   GitCommitHorizontal,
   GitFork,
   Globe,
@@ -67,6 +68,8 @@ function SongPage() {
   const getArtist = usePosttape((s) => s.getArtist);
   const getEnvironment = usePosttape((s) => s.getEnvironment);
   const toggleStar = usePosttape((s) => s.toggleStar);
+  const starrers = usePosttape((s) => s.starrers);
+  const stars = usePosttape((s) => s.stars);
   const inviteCollaborator = usePosttape((s) => s.inviteCollaborator);
   const pushCommit = usePosttape((s) => s.pushCommit);
   const starredIds = usePosttape((s) => s.starredIds);
@@ -74,6 +77,12 @@ function SongPage() {
   const setLinerNotes = usePosttape((s) => s.setLinerNotes);
   const shareEnvironmentWithSong = usePosttape((s) => s.shareEnvironmentWithSong);
   const ensureArtist = usePosttape((s) => s.ensureArtist);
+  const toggleMuteSong = usePosttape((s) => s.toggleMuteSong);
+  const isSongMuted = usePosttape((s) => s.isSongMuted);
+  const fileLegalNotice = usePosttape((s) => s.fileLegalNotice);
+  const recordAudit = usePosttape((s) => s.recordAudit);
+  const audit = usePosttape((s) => s.audit);
+
 
   const viewerId = isPending ? undefined : (user?.id ?? null);
   const song = getSong(owner, slug, viewerId);
@@ -88,6 +97,10 @@ function SongPage() {
   const [visOpen, setVisOpen] = useState(false);
   const [visConfirm, setVisConfirm] = useState("");
   const [notesDraft, setNotesDraft] = useState<string | null>(null);
+  const [starsOpen, setStarsOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportBody, setReportBody] = useState("");
+
 
   useEffect(() => {
     if (user) ensureArtist(user);
@@ -140,7 +153,10 @@ function SongPage() {
   const frozenCount = song.tracks.filter(
     (t) => t.freezeStatus === "frozen" || t.freezeStatus === "stem",
   ).length;
-  const isStarred = starredIds.includes(song.id);
+  const isStarred = user
+    ? stars.some((s) => s.songId === song.id && s.userId === user.id)
+    : starredIds.includes(song.id);
+
   const actorId = user?.id ?? song.ownerId;
   const manage = canManage(song, user?.id);
   const pushOk = canPush(song, user?.id);
@@ -151,10 +167,23 @@ function SongPage() {
   const myEnv = user ? getEnvironment(user.id) : null;
   const envShared = myEnv?.sharedSongIds.includes(song.id) ?? false;
   const liner = notesDraft ?? song.linerNotes ?? "";
+  const namedStars = starrers(song.id);
+  const muted = user ? isSongMuted(user.id, song.id) : false;
+  const songAudit = audit.filter((a) => a.songId === song.id).slice(0, 12);
+  void stars;
+
 
   return (
     <AppShell>
+      {song.takedownAt && (
+        <div className="border-b border-warn/30 bg-warn/10 px-4 py-2 text-center text-xs text-warn">
+          Legal hold since {formatRelative(song.takedownAt)}. Public access is
+          off; the files are preserved, not deleted.
+          {song.takedownReason ? ` ${song.takedownReason}.` : ""}
+        </div>
+      )}
       <div className="border-b border-border bg-bg-elevated/30">
+
         <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
           <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
             <div className="min-w-0">
@@ -182,6 +211,8 @@ function SongPage() {
                 <Badge variant="default" className="capitalize">
                   {song.daw}
                 </Badge>
+                {song.takedownAt && <Badge variant="warn">Legal hold</Badge>}
+
               </div>
               <h1 className="mt-2 font-display text-3xl tracking-tight sm:text-4xl">
                 {song.title}
@@ -210,25 +241,80 @@ function SongPage() {
             </div>
 
             <div className="flex flex-wrap gap-2 shrink-0">
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => {
-                  toggleStar(song.id);
-                  toast.success(isStarred ? "Unstarred" : "Starred");
-                }}
-              >
-                <Star
-                  className={
-                    isStarred ? "size-3.5 fill-current" : "size-3.5"
-                  }
-                />
-                {song.starCount}
-              </Button>
+              <div className="inline-flex overflow-hidden rounded-[var(--radius-sm)] border border-border">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="rounded-none border-0"
+                  onClick={() => {
+                    if (!user) {
+                      toast.error("Sign in to star a public song");
+                      return;
+                    }
+                    if (song.visibility !== "public") {
+                      toast.error("Only public songs can be starred");
+                      return;
+                    }
+                    const ok = toggleStar(song.id, user.id);
+                    if (ok) toast.success(isStarred ? "Unstarred" : "Starred");
+                  }}
+                >
+                  <Star
+                    className={
+                      isStarred ? "size-3.5 fill-current" : "size-3.5"
+                    }
+                  />
+                  {song.starCount}
+                </Button>
+                <button
+                  type="button"
+                  className="border-l border-border bg-bg-subtle px-2 text-[11px] text-fg-muted hover:text-fg"
+                  onClick={() => setStarsOpen(true)}
+                >
+                  Who
+                </button>
+              </div>
+              <Dialog open={starsOpen} onOpenChange={setStarsOpen}>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Starrers</DialogTitle>
+                    <DialogDescription>
+                      Public list. {song.starCount.toLocaleString()} stars
+                      {namedStars.length < song.starCount
+                        ? ` · showing ${namedStars.length} named in this prototype`
+                        : ""}
+                      .
+                    </DialogDescription>
+                  </DialogHeader>
+                  <ul className="space-y-2">
+                    {namedStars.map((row) => {
+                      const a = getArtist(row.userId);
+                      if (!a) return null;
+                      return (
+                        <li key={`${row.userId}-${row.createdAt}`}>
+                          <Link
+                            to="/u/$username"
+                            params={{ username: a.username }}
+                            className="flex items-center gap-2 text-sm hover:text-accent"
+                            onClick={() => setStarsOpen(false)}
+                          >
+                            {a.displayName}
+                            <span className="text-xs text-fg-subtle">@{a.username}</span>
+                          </Link>
+                        </li>
+                      );
+                    })}
+                    {namedStars.length === 0 && (
+                      <li className="text-sm text-fg-subtle">No named starrers yet.</li>
+                    )}
+                  </ul>
+                </DialogContent>
+              </Dialog>
               <Button variant="secondary" size="sm" disabled>
                 <GitFork className="size-3.5" />
                 {song.forkCount}
               </Button>
+
               {manage && (
                 <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
                   <DialogTrigger asChild>
@@ -732,9 +818,10 @@ function SongPage() {
                     toast.error("Contributors can download the project package.");
                     return;
                   }
+                  if (user) recordAudit(song.id, user.id, "take.download");
                   toast.success("Package ready", {
                     description:
-                      "Demo: your .als + freeze stems would download here.",
+                      "Prototype: a JSON freeze package. The Agent ships a real .als.",
                   });
                 }}
               >
@@ -743,7 +830,102 @@ function SongPage() {
               </Button>
             </div>
 
+            {user && (
+              <div className="rounded-[var(--radius-lg)] border border-border bg-bg-elevated p-4 space-y-3">
+                <h3 className="text-xs font-medium uppercase tracking-wide text-fg-subtle">
+                  Notifications
+                </h3>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs text-fg-muted">Mute this song</span>
+                  <Switch
+                    checked={muted}
+                    onCheckedChange={() => toggleMuteSong(user.id, song.id)}
+                    aria-label="Mute this song"
+                  />
+                </div>
+              </div>
+            )}
+
+            {song.visibility === "public" && !song.takedownAt && (
+              <div className="rounded-[var(--radius-lg)] border border-border bg-bg-elevated p-4">
+                <h3 className="text-xs font-medium uppercase tracking-wide text-fg-subtle">
+                  Trust
+                </h3>
+                <p className="mt-2 text-xs text-fg-muted">
+                  Report infringement, abuse, or malware. DMCA notices go to the
+                  designated agent.
+                </p>
+                <Dialog open={reportOpen} onOpenChange={setReportOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="secondary" size="sm" className="mt-3 w-full">
+                      <Flag className="size-3.5" />
+                      Report
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Report this song</DialogTitle>
+                      <DialogDescription>
+                        FR-N-04 — any user may report a public song. For a formal
+                        copyright claim use the DMCA form.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <Textarea
+                      value={reportBody}
+                      onChange={(e) => setReportBody(e.target.value)}
+                      placeholder="What should we look at?"
+                    />
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        size="sm"
+                        disabled={!reportBody.trim()}
+                        onClick={() => {
+                          fileLegalNotice({
+                            kind: "report",
+                            songId: song.id,
+                            reporterName: user?.displayName ?? "Guest",
+                            reporterEmail: user?.primaryEmail ?? "guest@posttape.example",
+                            body: reportBody,
+                          });
+                          toast.success("Report received");
+                          setReportBody("");
+                          setReportOpen(false);
+                        }}
+                      >
+                        Submit report
+                      </Button>
+                      <Button asChild size="sm" variant="secondary">
+                        <Link to="/legal/dmca">DMCA form</Link>
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </div>
+            )}
+
+            {manage && songAudit.length > 0 && (
+              <div className="rounded-[var(--radius-lg)] border border-border bg-bg-elevated p-4">
+                <h3 className="text-xs font-medium uppercase tracking-wide text-fg-subtle">
+                  Audit log
+                </h3>
+                <ul className="mt-3 space-y-2 text-[11px] text-fg-muted">
+                  {songAudit.map((row) => {
+                    const actor = getArtist(row.actorId);
+                    return (
+                      <li key={row.id}>
+                        <span className="text-fg">{actor?.username ?? row.actorId}</span>{" "}
+                        {row.action}
+                        {row.target ? ` → ${getArtist(row.target)?.username ?? row.target}` : ""}
+                        <span className="text-fg-subtle"> · {formatRelative(row.createdAt)}</span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
+
             {song.albumId && <AlbumLink albumId={song.albumId} />}
+
           </aside>
         </div>
       </div>

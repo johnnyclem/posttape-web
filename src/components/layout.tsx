@@ -10,10 +10,12 @@ import {
   X,
 } from "lucide-react";
 import { useState } from "react";
+import { NoticeBell } from "@/components/notice-bell";
 import { Button } from "@/components/ui/button";
 import { SignedIn, SignedOut, UserButton } from "@/lib/auth/gates";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { cn } from "@/lib/utils";
+
 
 const NAV = [
   { to: "/explore", label: "Explore", icon: Search },
@@ -77,6 +79,7 @@ export function AppHeader() {
             <div className="size-8 animate-pulse rounded-full bg-bg-subtle" />
           ) : user ? (
             <SignedIn>
+              <NoticeBell />
               <Link
                 to="/settings"
                 className={cn(
@@ -130,6 +133,15 @@ export function AppHeader() {
             })}
             {user && (
               <Link
+                to="/notifications"
+                onClick={() => setOpen(false)}
+                className="flex h-11 items-center gap-2 rounded-[var(--radius-sm)] px-3 text-sm text-fg-muted hover:bg-bg-subtle hover:text-fg"
+              >
+                Inbox
+              </Link>
+            )}
+            {user && (
+              <Link
                 to="/settings"
                 onClick={() => setOpen(false)}
                 className="flex h-11 items-center gap-2 rounded-[var(--radius-sm)] px-3 text-sm text-fg-muted hover:bg-bg-subtle hover:text-fg"
@@ -163,14 +175,26 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             Posttape — send songs like mail. Freeze before you post.
           </p>
           <div className="flex flex-wrap items-center gap-4 text-xs text-fg-subtle">
+            <Link to="/legal/terms" className="hover:text-fg transition-colors">
+              Terms
+            </Link>
+            <Link to="/legal/privacy" className="hover:text-fg transition-colors">
+              Privacy
+            </Link>
+            <Link to="/legal/dmca" className="hover:text-fg transition-colors">
+              DMCA
+            </Link>
+            <Link to="/legal/transparency" className="hover:text-fg transition-colors">
+              Transparency
+            </Link>
             <Link to="/design" className="hover:text-fg transition-colors">
               Design system
             </Link>
             <Link to="/settings" className="hover:text-fg transition-colors">
               Settings
             </Link>
-            <span>Ableton Live · flat folders · plugin-aware collab</span>
           </div>
+
         </div>
       </footer>
     </div>

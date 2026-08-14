@@ -1,5 +1,17 @@
-import type { ActivityItem, Album, Artist, MachineEnvironment, Song } from "./types";
+import type {
+  ActivityItem,
+  Album,
+  AppNotification,
+  Artist,
+  AuditEntry,
+  LegalNotice,
+  MachineEnvironment,
+  Song,
+  Star,
+  TransparencyStats,
+} from "./types";
 import { STOCK_PLUGIN_IDS } from "./plugins";
+
 
 const daysAgo = (d: number, hours = 0) =>
   new Date(Date.now() - d * 86_400_000 - hours * 3_600_000).toISOString();
@@ -11,6 +23,7 @@ export const ARTISTS: Artist[] = [
     displayName: "Ben Gibbard",
     bio: "Melodies first. Sending tapes across the country since forever.",
     avatarHue: 210,
+    handleClaimedAt: daysAgo(400),
     location: "Seattle, WA",
     daw: "Ableton Live 12",
     links: ["https://thepostalservice.com"],
@@ -21,6 +34,7 @@ export const ARTISTS: Artist[] = [
     displayName: "Jenny Lewis",
     bio: "Vocals, lyrics, late-night overdubs. Open the freeze, not the hard drive.",
     avatarHue: 28,
+    handleClaimedAt: daysAgo(380),
     location: "Los Angeles, CA",
     daw: "Ableton Live 12",
   },
@@ -30,6 +44,7 @@ export const ARTISTS: Artist[] = [
     displayName: "Jimmy Tamborello",
     bio: "Synths, clicks, glitches. Max for Live experiments welcome.",
     avatarHue: 265,
+    handleClaimedAt: daysAgo(390),
     location: "Los Angeles, CA",
     daw: "Ableton Live 12 + Max",
   },
@@ -39,6 +54,7 @@ export const ARTISTS: Artist[] = [
     displayName: "Taylor R.",
     bio: "Producer / mixer. If it isn't frozen, I can't open it on the road.",
     avatarHue: 155,
+    handleClaimedAt: daysAgo(40),
     location: "Austin, TX",
     daw: "Ableton Live 12",
   },
@@ -48,6 +64,7 @@ export const ARTISTS: Artist[] = [
     displayName: "Maya Chen",
     bio: "Bedroom pop, field recordings, and shared folders that finally make sense.",
     avatarHue: 340,
+    handleClaimedAt: daysAgo(200),
     location: "Brooklyn, NY",
     daw: "Logic + Ableton",
   },
@@ -857,3 +874,94 @@ export const ACTIVITY: ActivityItem[] = [
     createdAt: daysAgo(1, 2),
   },
 ];
+
+export const STARS: Star[] = [
+  { songId: "song-such-great-heights", userId: "u-jenny", createdAt: daysAgo(80) },
+  { songId: "song-such-great-heights", userId: "u-jimmy", createdAt: daysAgo(40) },
+  { songId: "song-such-great-heights", userId: "u-maya", createdAt: daysAgo(12) },
+  { songId: "song-such-great-heights", userId: "u-taylor", createdAt: daysAgo(0, 20) },
+  { songId: "song-coastal", userId: "u-ben", createdAt: daysAgo(6) },
+  { songId: "song-night-drive", userId: "u-jenny", createdAt: daysAgo(3) },
+];
+
+export const NOTIFICATIONS: AppNotification[] = [
+  {
+    id: "n-sgh-comment",
+    userId: "u-ben",
+    kind: "comment",
+    songId: "song-such-great-heights",
+    actorId: "u-jimmy",
+    message: "Jimmy commented at 1:12 on Lead_Heights",
+    url: "/songs/ben/such-great-heights",
+    createdAt: daysAgo(1, 2),
+  },
+  {
+    id: "n-sgh-push",
+    userId: "u-ben",
+    kind: "push",
+    songId: "song-such-great-heights",
+    actorId: "u-jenny",
+    message: "Jenny pushed harmonies on Vox_Harm",
+    url: "/songs/ben/such-great-heights",
+    createdAt: daysAgo(1, 3),
+  },
+  {
+    id: "n-taylor-invite",
+    userId: "u-taylor",
+    kind: "invite",
+    songId: "song-collab-demo",
+    actorId: "u-ben",
+    message: "Ben invited you as Contributor on You + Taylor",
+    url: "/songs/ben/you-and-taylor",
+    createdAt: daysAgo(2),
+  },
+  {
+    id: "n-district-freeze",
+    userId: "u-ben",
+    kind: "freeze.ready",
+    songId: "song-the-district-sleeps",
+    actorId: "u-jimmy",
+    message: "A freeze package is ready for The District Sleeps Alone Tonight",
+    url: "/songs/jimmy/the-district-sleeps",
+    createdAt: daysAgo(2),
+    readAt: daysAgo(1),
+  },
+];
+
+export const AUDIT: AuditEntry[] = [
+  {
+    id: "aud-1",
+    songId: "song-such-great-heights",
+    actorId: "u-ben",
+    action: "collaborator.invite",
+    target: "u-jimmy",
+    createdAt: daysAgo(118),
+  },
+  {
+    id: "aud-2",
+    songId: "song-such-great-heights",
+    actorId: "u-ben",
+    action: "collaborator.invite",
+    target: "u-jenny",
+    createdAt: daysAgo(90),
+  },
+  {
+    id: "aud-3",
+    songId: "song-collab-demo",
+    actorId: "u-ben",
+    action: "collaborator.invite",
+    target: "u-taylor",
+    createdAt: daysAgo(2),
+  },
+];
+
+export const LEGAL_NOTICES: LegalNotice[] = [];
+
+export const TRANSPARENCY: TransparencyStats = {
+  year: 2026,
+  noticesReceived: 4,
+  takedowns: 1,
+  counterNotices: 0,
+  reports: 7,
+};
+

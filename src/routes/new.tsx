@@ -65,6 +65,13 @@ function NewSongPage() {
       toast.error("Affirm you have the right to upload this project");
       return;
     }
+    if (analysis?.rejectedBinaries.length) {
+      toast.error("Plugin binaries and executables are rejected.", {
+        description: analysis.rejectedBinaries.slice(0, 4).join(", "),
+      });
+      return;
+    }
+
     setBusy(true);
     const artist = ensureArtist(user);
     const song = createSong({
@@ -196,6 +203,12 @@ function NewSongPage() {
 
           {analysis && (
             <div className="rounded-[var(--radius-lg)] border border-border bg-bg-elevated p-4">
+              {analysis.rejectedBinaries.length > 0 && (
+                <p className="mb-3 text-xs text-warn">
+                  Rejected (plugin binaries / executables):{" "}
+                  {analysis.rejectedBinaries.join(", ")}
+                </p>
+              )}
               <div className="flex flex-wrap gap-2">
                 <Badge variant="signal">DAW: {analysis.daw}</Badge>
                 <Badge variant="default">
